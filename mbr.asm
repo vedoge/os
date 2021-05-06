@@ -54,8 +54,9 @@ DOUBLE_FAULT:
 	JNC		LOAD
 TRIPLE_FAULT:
 LOADROOTDIR:
+	MOV AH, 19
+	;Find KERNEL and load it into memory(at 0x1000)
 	
-	;Find KERNEL.BIN and load it into memory(at 0x1000)
 BOOTEND:
 TIMES 510 - ($-$$) DB 0
 DW              AA55H
