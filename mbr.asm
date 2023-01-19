@@ -65,25 +65,24 @@ ENTRY:
 	MOV AX, 0x20E		;2 for function, e clusters (14, not 2.71828...)
 	INT 0x13		;go!
 _SEARCHROOTDIR:			;where file?
-	MOV DI, KernName	;FIXME FIXME FIXME TODO TODO TODO
-	MOV SI, 
-	MOV AX,
+	MOV SI, KernName	;FIXME FIXME FIXME TODO TODO TODO
+	MOV DI, Buffer
+	MOV CX, 224
+	MOV AX, 0
 _INTLOOP:			;REP CMPSB needs CX, so DX is our dustbin
-	PUSH AX
 	XCHG CX, DX
 	MOV CX, 11
 	REP CMPSB
 	JE FOUND_FILE
 	XCHG CX, DX		;don't actually eat stuff from the dustbin irl.
-	POP AX
 _NEXT:
 	ADD 32
-	MOV SI, AX
+	LEA DI, [AX+Buffer]
 	LOOP _INTLOOP
 _FOUND_FILE:
-	MOV AX, [DI+0x0F]
-	PUSH AX 
-_LOAD_TABLE:
+	PUSH [DI+0x0F] 		;squirreled away
+	CALL READ_SECTOR
+;load fat table
 	MOV AX, 1
 	CALL LBACHS
 	MOV BX, 0
@@ -106,12 +105,31 @@ _CALC_FAT:
 	MOV BX, 2		;3 bytes per 2 entries (goddamn you microsoft)
 	DIV BX
 	OR DX, DX
-	JZ _EVEN
-_ODD:
+	JZ _ODD
+_EVEN:
 	ADD SI			;we can clobber this, there's a copy safe in memory
-	
+MOV BX, SI
+AND 0x0FFF
+
+READ_CLUSTER:
+POP AX
+PUSH AX
+ADD 31
+CALL LBACHS
+MOV BX, [Pointer]
+PUSH BX
+MOV AX, 0x201
+INT 0x13
+POP AX
+ADD 512
+MOV [Pointer], AX
+RET
+
+
+
 KernName: db "VOS     SYS"
 Cluster: dw 0
-Pointer: dw 0
+Pointer: dw 0x2000
 TIMES 510 - ($-$$) DB 0
 DW 0xAA55
+Buffer: 
