@@ -62,11 +62,12 @@ ENTRY:
 	XOR BX, BX
 	MOV ES, BX
 	MOV BX, 0x7E00
+	MOV AX, 0x20E		;2 for function, e clusters (14, not 2.71828...)
 	INT 0x13		;go!
 _SEARCHROOTDIR:			;where file?
-	MOV SI, KernName
-	XCHG SI, AX
-	MOV AX, 0
+	MOV DI, KernName	;FIXME FIXME FIXME TODO TODO TODO
+	MOV SI, 
+	MOV AX,
 _INTLOOP:			;REP CMPSB needs CX, so DX is our dustbin
 	PUSH AX
 	XCHG CX, DX
@@ -76,29 +77,41 @@ _INTLOOP:			;REP CMPSB needs CX, so DX is our dustbin
 	XCHG CX, DX		;don't actually eat stuff from the dustbin irl.
 	POP AX
 _NEXT:
-	ADD AX, 32
+	ADD 32
 	MOV SI, AX
 	LOOP _INTLOOP
 _FOUND_FILE:
 	MOV AX, [DI+0x0F]
-	MOV [Cluster], AX	;just in case we get clobbered
-_LOAD_FAT:
+	PUSH AX 
+_LOAD_TABLE:
 	MOV AX, 1
 	CALL LBACHS
 	MOV BX, 0
 	MOV ES, BX
 	MOV BX, 0x7E00
 	MOV AX, 0x200
-	MUL 0xE
+	MOV CX, 0xE
+	MUL CX
 	ADD BX
 	MOV BX, AX
+	PUSH BX
+	MOV [Pointer], BX	;doesn't hurt to make doubly sure
 	MOV AX, 0x902
-	PUSHA
 	INT 0x13
-	POPA
 _CALC_FAT:
+	POP SI
+	MOV AX, [Cluster]
+	MOV BX, 3
+	MUL BX
+	MOV BX, 2		;3 bytes per 2 entries (goddamn you microsoft)
+	DIV BX
+	OR DX, DX
+	JZ _EVEN
+_ODD:
+	ADD SI			;we can clobber this, there's a copy safe in memory
 	
 KernName: db "VOS     SYS"
 Cluster: dw 0
+Pointer: dw 0
 TIMES 510 - ($-$$) DB 0
 DW 0xAA55
