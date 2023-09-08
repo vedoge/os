@@ -2,7 +2,7 @@ BITS 16
 ORG 7C00h
 JMP BEGIN 
 BPB:
-	;//stolen from the good folks at Wikipedia (thanks btw) and random documentation I found online
+	;//written with help from the good folks at Wikipedia (thanks btw) and random documentation I found online
 BYTESPERSECTOR: DW 512
 SECTORSPERCLUSTER: DB 1
 RESERVEDSECTORS: DW 0
@@ -24,6 +24,11 @@ LABEL: DB "VOSFLOPPY  "
 FS: "FAT12   "
 
 BEGIN:
+	CLI				;//interrupts may cause problems when changing stack
+	MOV SS, CS
+	MOV AX, 0x7C00	;//stack grows directly below us
+	MOV SP, AX
+	STI
 	MOV AH, 0
 	MOV DL, 0
 	INT 13h 
@@ -40,18 +45,21 @@ BEGIN:
 	CALL BPRINT
 	CLI
 	HLT
-	;//FAT loaded at 7c0:200 (0000:7e00, 200h/512b above us
+	;//FAT loaded at 7c0:200 (0000:7e00, 512b above us)
 	;//load root directory next
-tt566	;//loading at 0200:0000 (0x2000)
+	;//loading at 0200:0000 (0x2000)
 READROOTDIR:
 	MOV AX, 19		;//starting at LBA 19
 	CALL LBACHS
 	MOV AH, 0x02
 	MOV AL, 14		;//read 14 sectors in root dir.
-	MOV ES, 0x0170		;//contiguous block afer the FAT table, ending 0x3300 (kernel loading point). 
+	MOV BX, 0x0170	;//contiguous block afer the FAT table, ending 0x3300 (kernel loading point). 
+	MOV ES, BX
 	XOR BX, BX		
 	INT 13h
 	JNC SEARCHDIR
+	;//if carry (read failed for whatever reason)
+	;//halt and catch fire
 	MOV DS, CS
 	MOV SI, ROOTDIRERROR
 	CALL BPRINT
@@ -74,11 +82,23 @@ REP	CMPSB
 	XCHG CX, DX
 LOOP	SEARCHKERN
 KERNFOUND:
-	LEA AX, [ES:DI+0xF]	;//11 (file length) + 15 (random info) = 26 (cluster offset)
-	MOV WORD [KERNCLUST], AX;//keep it safe
+	MOV AX, [ES:DI+0xF]	;//11 (file length) + 15 (random info) = 26 (cluster offset)
+	PUSH AX
 	MOV AX, 0x330
 	MOV ES, AX
-	
+	XOR BX, BX			;//ES:BX is loadpoint of starting (first) sector
+	POP AX
+	MOV WORD [KERNCLUST], AX
+LOADKERN:
+	CALL LBACHS
+	INT 13h
+	ADD BX, 0x200
+	MOV AX, WORD [KERNCLUST]
+	CALL NEXTCLUSTER
+	CMP AX, [EOF]
+	JE STARTKERN
+	JMP LOADKERN
+
 LBACHS:	
 
 ;//Function needs to be corrected for HDD geometry; top two C bits have to go into the top two bits in CL
@@ -94,6 +114,29 @@ LBACHS:
 	MOV CH, AL
 	XOR DL, DL
 	RET
+NEXTCLUSTER:
+	;//ax contains cluster number
+	MOV DX, 0
+	MOV BX, 3
+	MUL BX
+	MOV DX, 0
+	MOV BX, 2
+	DIV BX
+	MOV SI, 0x500
+	MOV DS, SI
+	XOR SI, SI
+	MOV SI, AX
+	MOV AX, [DS:SI]
+	OR DX, DX
+	JZ EVEN
+	;//entry is odd
+	;//lowest nibble not needed, shift out
+	SHR AX, 4
+	RET
+EVEN:
+	AND AX, 0x0FFF	;//mask highest nibble
+	RET
+
 BPRINT:
 	MOV AH, 0x0E
 	LODSB
