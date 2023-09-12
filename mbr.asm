@@ -19,9 +19,9 @@ LARGESECTORS: DD 0
 DRIVENO: DB 0
 FLAGS: DB 0
 EXTBOOTSIGNATURE: DB 0x29
-SERIAL: DD 0
-LABEL: DB "VOSFLOPPY  "
-FS: "FAT12   "
+SERIAL: DD 0				;//any 32 bits
+LABEL: DB "VOSFLOPPY  "			;//volume label ALWAYS 11 CHARS
+FS: DB "FAT12   "
 
 BEGIN:
 	CLI				;//interrupts may cause problems when changing stack
@@ -40,10 +40,10 @@ BEGIN:
 	XOR BX, BX		;//ES:BX = 0050:0000 (0x500), first free block of memory
 	INT 0x13		;//IVT ends at 3FFh though
 	JNC READROOTDIR
-	MOV DS, CS
-	MOV SI, FATERROR
-	CALL BPRINT
-	CLI
+	MOV DS, CS		;//DS and CS are same so that our offsets work
+	MOV SI, FATERROR	;//FAT error string
+	CALL BPRINT		;//print it
+	CLI			;//halt and catch fire
 	HLT
 	;//FAT loaded at 7c0:200 (0000:7e00, 512b above us)
 	;//load root directory next
@@ -146,5 +146,6 @@ BPRINT:
 	JMP BPRINT
 .BPRINTDONE:
 	RET
+FLOPPYERROR:	DB "Floppy error!", 0
 TIMES 510 - ($-$$) DB 0 
 DW AA55h 
