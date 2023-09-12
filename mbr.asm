@@ -21,11 +21,11 @@ FLAGS: DB 0
 EXTBOOTSIGNATURE: DB 0x29
 SERIAL: DD 0				;//any 32 bits
 LABEL: DB "VOSFLOPPY  "			;//volume label ALWAYS 11 CHARS
-FS: DB "FAT12   "
-
+FILESYSTEM: DB "FAT12   "
 BEGIN:
 	CLI				;//interrupts may cause problems when changing stack
-	MOV SS, CS
+	MOV AX, CS
+	MOV SS, AX
 	MOV AX, 0x7C00	;//stack grows directly below us
 	MOV SP, AX
 	STI
@@ -34,19 +34,19 @@ BEGIN:
 	INT 13h 
 	MOV AX, 0
 	CALL LBACHS
+	MOV AX, 0x0050		
+	MOV ES, AX
 	MOV AH, 0x02
-	MOV AL, 9
-	MOV ES, 0x0050		
+	MOV AL, 0x9
 	XOR BX, BX		;//ES:BX = 0050:0000 (0x500), first free block of memory
 	INT 0x13		;//IVT ends at 3FFh though
 	JNC READROOTDIR
-	MOV DS, CS		;//DS and CS are same so that our offsets work
-	MOV SI, FATERROR	;//FAT error string
+	MOV AX, CS
+	MOV DS, AX
+	MOV SI, FLOPPYERROR	;//floppy error string
 	CALL BPRINT		;//print it
 	CLI			;//halt and catch fire
 	HLT
-	;//FAT loaded at 7c0:200 (0000:7e00, 512b above us)
-	;//load root directory next
 	;//loading at 0200:0000 (0x2000)
 READROOTDIR:
 	MOV AX, 19		;//starting at LBA 19
@@ -60,16 +60,19 @@ READROOTDIR:
 	JNC SEARCHDIR
 	;//if carry (read failed for whatever reason)
 	;//halt and catch fire
-	MOV DS, CS
-	MOV SI, ROOTDIRERROR
+	MOV AX, CS
+	MOV DS, AX
+	MOV SI, FLOPPYERROR
 	CALL BPRINT
 	CLI
 	HLT
 SEARCHDIR:
-	MOV DS, CS		;//DS=CS
+	MOV AX, CS
+	MOV DS, AX
 	MOV SI, KERNFNAME
 	XOR DI, DI
-	MOV ES, 0x0170		;//ES:DI addresses 0170:0000 (0x01700) which is where we loaded our root directory
+	MOV AX, 0x0170
+	MOV ES, AX
 	MOV CX, [ROOTDIRENTRIES]
 	MOV AX, 0
 SEARCHKERN:
@@ -95,10 +98,11 @@ LOADKERN:
 	ADD BX, 0x200
 	MOV AX, WORD [KERNCLUST]
 	CALL NEXTCLUSTER
-	CMP AX, [EOF]
+	CMP AX, 0x0FFF			;//compare to FAT12 EOF character
 	JE STARTKERN
 	JMP LOADKERN
-
+STARTKERN: 
+	JMP 0x0330:0000			;//kernel loading address.
 LBACHS:	
 
 ;//Function needs to be corrected for HDD geometry; top two C bits have to go into the top two bits in CL
@@ -109,7 +113,7 @@ LBACHS:
 	INC DX
 	MOV CL, DL
 	MOV DX, 0 
-	DIV [HEADS]
+	DIV WORD [HEADS]
 	MOV DH, DL
 	MOV CH, AL
 	XOR DL, DL
@@ -147,5 +151,7 @@ BPRINT:
 .BPRINTDONE:
 	RET
 FLOPPYERROR:	DB "Floppy error!", 0
+KERNCLUST: DW 0
+KERNFNAME: DB "KERNEL  BIN"
 TIMES 510 - ($-$$) DB 0 
-DW AA55h 
+DW 0xAA55 
