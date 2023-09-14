@@ -3,6 +3,7 @@ ORG 7C00h
 JMP BEGIN 
 BPB:
 	;//written with help from the good folks at Wikipedia (thanks btw) and random documentation I found online
+OEMLBL: DB "VOSFLP  "
 BYTESPERSECTOR: DW 512
 SECTORSPERCLUSTER: DB 1
 RESERVEDSECTORS: DW 0
