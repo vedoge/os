@@ -1,19 +1,21 @@
+;//Dear reader, 
+;//The fact that this is a resounding success is evident from the dearth of comments here. 
+;//However, much work is still to be done.
+;//This bootloader must account for the fact that floppy reads on actual systems fail very, very often.
+;//It is not unusual to find that 3-4 rereads are needed to get a sector right. 
+;//This bootloader is not ready to be run on a physical system. This comment may be removed later.
+;//Until then, run this at your own risk. If you understand the code, read it, paying particular attention to disk I/O. 
+;//It is however worth noting that this code is perfectly safe to run on a virtual system, or a semi-recent system. 
+;//Some code may not run on systems that are <i386-based. 
+;//Yours truly, 
+;//Vedant G, Singapore, 22:22 UTC+08 2023-11-23.
 BITS 16
 ORG 0x7C00
 JMP BEGIN 
 NOP
-;//revised memory map 
-;//the bootloader in a 16 bit bios system is loaded at 0x7c00. After lengthy experimentation, 
-;//I figured the 7bff bytes beforehand are probably not free for my own use. 
-;//oops. 
-;//Keeping this in mind, I have begun to assign new memory addresses to everything. 
-;//Root dir is the 0x1800 (0x200*0xC) bytes after 0x7e00. 
-;//After the root dir we store the FAT table beginning 0x9600 onwards. 
-;//we load the operating system, as is convention, at 0x2000:0000 (0x20000)
-;//keep in mind that this bootloader was originally written with different offsets in mind, so bugs may be found elsewhere later in the process. 
 BPB:
 ;//written with help from the good folks at Wikipedia (thanks btw) and random documentation I found online
-;//Mountable on Linux; maybe not so on MS-DOS (windows)
+;//Mountable on Linux; maybe not so on MS-DOS (Windows)
 OEMLBL: DB "VOSFLP  "
 BYTESPERSECTOR: DW 512
 SECTORSPERCLUSTER: DB 1
@@ -88,7 +90,7 @@ LOOP	SEARCHKERN
 LOADFAT:
 	MOV AX, [ES:DI+0xF]	;//11 (file length) + 15 (random info) = 26 (cluster offset)
 	MOV [KERNCLUST], AX 	;//save the kernel cluster in memory
-	MOV AX, 2		;//logical sector 2 - fat copy #1
+	MOV AX, 1		;//logical sector 2 - fat copy #1
 	CALL LBACHS		;//fill in CHS table
 	MOV AH, 2		;//read sectors from drive
 	MOV AL, 9		;//9 sectors per FAT
@@ -96,78 +98,59 @@ LOADFAT:
 	MOV ES, BX		;//load the FAT into memory at 0x9A00
 	XOR BX, BX
 	INT 0x13
-	JNC SETUPKERN		;//begin loading kernel sectors into memory
-	;//something went wrong
-	PUSH CS
-	POP DS			;//CS=DS
-	MOV SI, FLOPPYERROR	;//floppy error string
-	CALL BPRINT		;//print it
-	CLI			;//halt and catch fire
-	HLT
+	;//works until this point confirmed. 
 SETUPKERN:
 	;//define the segmentation of the kernel. 
-	PUSH CS
+	PUSH ES
 	POP DS
-	MOV SI, KERNELDEBUG
-	CALL BPRINT 
-	CLI 
-	HLT
-	MOV AX, 0x09A0
-	MOV DS, AX		;//DS=FAT addressing (DS:SI is our buffer pointer to use when calculating next clusters)
-	MOV AX, 0xAC0		;//0x9A00 + 0x9*0x200=0xAC00
+	MOV AX, 0x2000		;//0x9A00 + 0x9*0x200=0xAC00
 	MOV ES, AX		;//ES=buffer address segment (ES:BX is the buffer address pointer for INT 0x13)
 	XOR BX, BX		;//ensure buffer address pointer is set to 0 (kernel size limit of 640KiB) 
 LOADKERN:
-	MOV AX, WORD [KERNCLUST];//retrieve the kernel cluster from memory
-	PUSH AX			;//put it on the stack for later
-	;//load the specified sector
-	ADD AX, 31		;//constant to cope with offset due to MBR, FATs, and root dir
-	CALL LBACHS 		;//calculate CHS
-	MOV AH, 2		;//read sectors
-	MOV AL, 1		;//1 sector
-	;//*******************************************************************************************************************
-	;//OFFENDING CALL FIXME
-	INT 0x13
-	;//OFFENDING CALL FIXME
-	;//*******************************************************************************************************************
+	;//FIXME FIXME FIXME
+	;//me, 10:15 pm: It appears to be a problem with this function somehow. My loop appears to break. 
+	;//TODO TODO TODO 
+	;//I'll work this out tomorrow. Right now, no bren. 
+	;//Me, signing off. 
 	MOV AX, WORD [KERNCLUST]
-	ADD BX, 0x200		;//add 512 bytes to ES:BX to get address to load next sector
-	;//ax contains cluster number
-	MOV DX, 0
+	PUSH AX
+	ADD AX, 34			;//offset to cope with the way LBACHS calculates. 
+	CALL LBACHS
+	MOV AH, 0x02
+	MOV AL, 0x01
+	INT 0x13
+	ADD BX, 0x200		;//bump buffer address pointer by 512 bytes
+	POP AX
+	PUSH BX
 	MOV BX, 3
 	MUL BX
-	MOV DX, 0
-	MOV BX, 2		;//12 packed bits per entry = 3/2 the offset
+	MOV BX, 2
 	DIV BX
-	MOV AX, WORD [DS:SI]	;//read value from FAT table
-	MOV [KERNCLUST], AX
-	OR DX, DX
-	JZ EVEN		;//if remainder of division by 2 is 0 entry is even
-	;//entry is odd
-	;//lowest nibble not needed, shift out
-	SHR AX, 4
-	CMP AX, 0x0FF8
-	JAE ENTER
-	JMP LOADKERN
+	MOV SI, AX
+	MOV AX, [DS:SI]
+	CMP DX, 0
+	JNZ ODD
 EVEN:
-	AND AX, 0x0FFF	;//mask highest nibble
-	CMP AX, 0x0FF8
-	JAE ENTER
-	JMP LOADKERN
-;//PROBLEM INPUTS TO LBACHS FIXME FIXME FIXME TODO TODO TODO
-;//AX=0x0022 (34)
-;//INT 0x13 DOESN'T LIKE AND PROGRESSES INTO INFINITE LOOP
+	SHR AX, 4		;//low nibble is part of another entry
+	;//fallthrough, but it makes no difference anyways. 
+ODD:
+	AND AX, 0x0FFF		;//high nibble is part of another entry
+	CMP AX, 0x0FF0
+	JGE ENTER
+	MOV [KERNCLUST], AX
+	POP BX
+	JMP LOADKERN 
 LBACHS:	
-	;//function is specific to small disk geometries and must be modified
+	;//function is specific to 3.5" diskette format and must be modified to fit larger and more general disks. 
 	;//puts CHS parameters in the right place for INT 0x13 to use
 	PUSH BX
 	MOV DX, 0
 	MOV BX, 18
-	DIV BX		;//remainder ranges between 0 and 17, and is the sector -1
+	DIV BX		;//remainder ranges between 0 and 17 (DX = sector - 1)
 	INC DX		;//add 1 to make it 1-18 for proper addressing
-	MOV CL, DL
+	MOV CL, DL	;//put in place
 	MOV DX, 0 
-	MOV BX, 2
+	MOV BX, 2	;//calculate head and cylidner
 	DIV BX
 	MOV DH, DL
 	MOV CH, AL
@@ -180,17 +163,12 @@ BPRINT:
 	LODSB
 	CMP AL, 0
 	JE .BPRINTDONE
-	INT 10h
+	INT 0x10
 	JMP BPRINT
 .BPRINTDONE:
 	RET
 ENTER:
-	PUSH CS
-	POP DS
-	MOV SI, KERNELDEBUG
-	CALL BPRINT
-	CLI
-	HLT
+	JMP 0x2000:0000
 FLOPPYERROR:	DB "Floppy error!", 0
 KERNELDEBUG: DB "Checkpoint", 0
 KERNCLUST: DW 0
