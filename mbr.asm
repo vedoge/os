@@ -14,7 +14,7 @@ ORG 0x7C00
 JMP BEGIN 
 NOP
 BPB:
-;//written with help from the good folks at Wikipedia (thanks btw) and random documentation I found online
+;//written with help from the good folks at OSDev and Wikipedia (thanks btw) and random documentation I found online
 ;//Mountable on Linux; maybe not so on MS-DOS (Windows)
 OEMLBL: DB "VOSFLP  "
 BYTESPERSECTOR: DW 512
@@ -48,9 +48,13 @@ BEGIN:
 	MOV AH, 0
 	MOV DL, 0
 	INT 0x13
-	
-	
-	MOV AX, 19		;//root dir starts at LBA 19
+
+	PUSH BX
+	MOV AX, [SECTORSPERFAT]	;//sectors taken up by 1 FAT
+	MOV BX, [NUMBEROFFATS]	;//sectors per FAT * number of FATS = total sectors taken up by FATS
+	MUL BX			;//I don't think multiplication can be done with [mem16] unless imul is used, sooo
+	INC AX			;//+1 for the boot sector
+	POP BX			;//restore old value of BX
 	CALL LBACHS		;//convert into params for INT 0x13
 	MOV AX, 0x07E0		
 	MOV ES, AX		;//set up memory
@@ -58,7 +62,8 @@ BEGIN:
 	MOV AL, 14
 	XOR BX, BX		;//ES:BX = 07E0:0000 (0x7E00), first free block of memory
 	INT 0x13
-	JNC READROOTDIR
+	JNC READROOTDIR		;//if no error, proceed. 
+
 	MOV AX, CS
 	MOV DS, AX
 	MOV SI, FLOPPYERROR	;//floppy error string
@@ -75,6 +80,7 @@ READROOTDIR:
 	XOR DI, DI
 	MOV CX, [ROOTDIRENTRIES];//loop through all the root entries available (224 in this case) 
 	MOV AX, 0		;//AX is our offset
+
 SEARCHKERN:
 	PUSH AX			;//store offset at beginning of code
 	MOV SI, KERNFNAME	;//DS:SI contains reference string, ES:DI points to root dir.
@@ -82,6 +88,7 @@ SEARCHKERN:
 	XCHG CX, DX		;//exchange loop indices (entry is stored safely in DX, while CX is used by REP)
 REP	CMPSB			;//compare the CX characters at DS:SI and ES:DI
 	JE LOADFAT		;//exit the loop if equal (we have a match safely in ES:DI)
+
 	POP AX			;//if not, prepare to offset the index.
 	ADD AX, 32
 	MOV DI, AX		;//offset ES:DI using our search index
@@ -103,7 +110,7 @@ SETUPKERN:
 	;//define the segmentation of the kernel. 
 	PUSH ES
 	POP DS
-	MOV AX, 0x2000		;//0x9A00 + 0x9*0x200=0xAC00
+	MOV AX, 0x2000		;//0x9A00 + 0x9*0x200=0xAC00 which is first address after FAT
 	MOV ES, AX		;//ES=buffer address segment (ES:BX is the buffer address pointer for INT 0x13)
 	XOR BX, BX		;//ensure buffer address pointer is set to 0 (kernel size limit of 640KiB) 
 LOADKERN:
@@ -112,10 +119,11 @@ LOADKERN:
 	;//TODO TODO TODO 
 	;//I'll work this out tomorrow. Right now, no bren. 
 	;//Me, signing off. 
-	MOV AX, WORD [KERNCLUST]
-	PUSH AX
-	ADD AX, 34			;//offset to cope with the way LBACHS calculates. 
-	CALL LBACHS
+	;//Bootloader now works, don't worry
+	MOV AX, WORD [KERNCLUST]	;//for the loop
+	PUSH AX			;//save for later
+	ADD AX, 34		;//offset to cope with the way LBACHS calculates (LBA 35 = first data sector)
+	CALL LBACHS		;//put things in the right places
 	MOV AH, 0x02
 	MOV AL, 0x01
 	INT 0x13
@@ -124,10 +132,10 @@ LOADKERN:
 	PUSH BX
 	MOV BX, 3
 	MUL BX
-	MOV BX, 2
+	MOV BX, 2		;//multiply by 3/2 as each FAT entry is 12 bits each, with two entries packed into three bytes
 	DIV BX
 	MOV SI, AX
-	MOV AX, [DS:SI]
+	MOV AX, [DS:SI]		;//for copying and comparing
 	CMP DX, 0
 	JNZ ODD
 EVEN:
@@ -138,18 +146,18 @@ ODD:
 	CMP AX, 0x0FF0
 	JGE ENTER
 	MOV [KERNCLUST], AX
-	POP BX
+	POP BX			;//restore old value of BX for the buffer address pointer
 	JMP LOADKERN 
 LBACHS:	
 	;//function is specific to 3.5" diskette format and must be modified to fit larger and more general disks. 
 	;//puts CHS parameters in the right place for INT 0x13 to use
 	PUSH BX
 	MOV DX, 0
-	MOV BX, 18
+	MOV BX, [SECTORSPERTRACK]
 	DIV BX		;//remainder ranges between 0 and 17 (DX = sector - 1)
 	INC DX		;//add 1 to make it 1-18 for proper addressing
 	MOV CL, DL	;//put in place
-	MOV DX, 0 
+	MOV DX, 0
 	MOV BX, 2	;//calculate head and cylidner
 	DIV BX
 	MOV DH, DL
@@ -168,7 +176,7 @@ BPRINT:
 .BPRINTDONE:
 	RET
 ENTER:
-	JMP 0x2000:0000
+	JMP 0x2000:0000	;//Kernel entry point
 FLOPPYERROR:	DB "Floppy error!", 0
 KERNELDEBUG: DB "Checkpoint", 0
 KERNCLUST: DW 0
