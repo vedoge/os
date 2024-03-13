@@ -109,7 +109,7 @@ SETUPKERN:
 	;//define the segmentation of the kernel. 
 	PUSH ES
 	POP DS
-	MOV AX, 0x1000		;//0x9A00 + 0x9*0x200=0xAC00 which is first address after FAT
+	MOV AX, 0x100		;//0x9A00 + 0x9*0x200=0xAC00 which is first address after FAT
 	MOV ES, AX		;//ES=buffer address segment (ES:BX is the buffer address pointer for INT 0x13)
 	XOR BX, BX		;//ensure buffer address pointer is set to 0 (kernel size limit of 640KiB) 
 LOADKERN:
@@ -178,39 +178,66 @@ BPRINT:
 	JMP BPRINT	;//loop for next character
 .BPRINTDONE:
 	RET		;//quick end
-ENTER:
-	CLI
-	MOV EAX, 0
-	LEA EAX, CS:GDT	;//add linear address into EAX
-	MOV DWORD [GDTADDR + 2], EAX
-	MOVZX BX, [LENGDT]
-	ADD EAX, EBX
-	MOV WORD [GDTADDR], AX	
-	LGDT [GDTADDR]		;//load the gdt
-	SMSW AX 
-	OR AX, 0x01		;//protection enable bit
-	LMSW AX			;//go!
+ENTER:			;//fixme fixme fixme
+	;//A20 line
+	IN AL, 0x93
+	OR AL, 2
+	AND AL, 0xFE
+	OUT 0x92, AL	;//FAST A20 (supported on all >PS/2 systems including PC/AT and PC/XT)
+	LGDT [GDTADDR]	;//load the GDT
+	MOV AX, 0x28	;//0x5*0x8=0x28, 5th GDT entry
+	LTR AX		;//establish 1st task to be executed
+	MOV EAX, 0x10	;//second segment (DATASEG RPL=0)
+	MOV DS, EAX
+	MOV ES, EAX
+	MOV SS, EAX
+	MOV EAX, 0	;//Unused registers
+	MOV FS, EAX
+	MOV GS, EAX
+	MOV EAX, CR0
+	OR EAX, 1
+	MOV CR0, EAX	;//Pray
 BITS 32
-	JMP 0x8:0x10000	;//Kernel entry point (also clear instruction pipeline, which would otherwise contain garbage)
+	JMP 0x0:0x1000
 BITS 16
 FLOPPYERROR:	DB "Floppy error!", 0
-KERNCLUST: DW 0
-DB 0
-KERNFNAME: DB "KERNEL  BIN"
+KERNCLUST:	DW 0
+KERNFNAME:	DB "KERNEL  BIN"
 GDT: 
-	DQ 0			;//null gdt entry
-	DD 0xFFFF0000		;//base 0xYYYY0000h, limit 0xYFFFF
-	DD 0x00CF9A00		;//base 00000000h, limit FFFFFh (=1048576), access byte = 0xC (system), flags = 0x9A (DPL 0, code)
-	DD 0xFFFF0000		;//same settings for memory
-	DD 0x00CF9200		;//flags 0xC, access 0x92 - System, DPL 0, Write bit, no execute
-	DD 0XFFFF0000		;//same memory
-	DD 0x00CFFA00		;//flag A - no System bit set
-	DD 0xFFFF0000		
-	DD 0x00CFF200		;//Flags 0xC, DPL 3 (user), type A (data) 
-LENGDT: DB $-GDT			;//length of gdt
+	DQ 0
+; actual entries
+	;//CODESEG(DPL=0)
+	DW 0xFFFF
+	DW 0x0000
+	DW 0x9A00
+	DW 0x00CF
+	;//DATASEG(DPL=0)
+	DW 0XFFFF
+	DW 0x0000
+	DW 0x9200
+	DW 0x00CF
+	;//CODESEG(DPL=3)
+	DW 0xFFFF
+	DW 0x0000
+	DW 0xFA00
+	DW 0x00CF
+	;//DATASEG(DPL=3)
+	DW 0xFFFF
+	DW 0x0000
+	DW 0xF200
+	DW 0x00CF
+	;//TSS
+	DW ENDTSS-TSS
+	DW TSS
+	DW 0x8900
+	DW 0x00CF
+LENGDT: 
 GDTADDR:
-	DW 0
-	DD 0
-BUF:				;//General purpose temporary data storage (guaranteed at least 192 bytes)
+	DW LENGDT - GDT
+	DD GDT
+;//we need 68 bytes for our TSS and frankly idk if we have it.
+TSS:			;//temporary TSS to stop us triple faulting 
+TIMES 0x68 DB 0
+ENDTSS:
 TIMES 510 - ($-$$) DB 0 
 DW 0xAA55 
