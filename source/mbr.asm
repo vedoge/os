@@ -45,8 +45,8 @@ BEGIN:
 	STI			;//0xC00 bytes = 12 * 256 = 3096 bytes of stack should be plenty
 
 	;//reset the floppy system
-	MOV AH, 0		;//reset
-	MOV DL, 0		;//drive 0
+	XOR AH, AH		;//reset
+	XOR DL, DL		;//drive 0
 	INT 0x13
 
 	PUSH BX
@@ -66,8 +66,6 @@ BEGIN:
 
 	MOV AX, CS
 	MOV DS, AX
-	MOV SI, FLOPPYERROR	;//floppy error string
-	CALL BPRINT		;//print it
 	CLI			;//halt and catch fire
 	HLT
 
@@ -79,7 +77,7 @@ READROOTDIR:
 	MOV ES, AX		;//07E0:0000 (0x7E00)
 	XOR DI, DI
 	MOV CX, [ROOTDIRENTRIES];//loop through all the root entries available (224 in this case) 
-	MOV AX, 0		;//AX is our offset
+	XOR AX, AX		;//AX is our offset
 
 SEARCHKERN:
 	PUSH AX			;//store offset at beginning of code
@@ -129,10 +127,10 @@ LOADKERN:
 	ADD BX, 0x200		;//bump buffer address pointer by 512 bytes
 	POP AX
 	PUSH BX
-	MOV DX, 0		;//zero upper byte
+	XOR DX, DX		;//zero upper byte
 	MOV BX, 3
 	MUL BX
-	MOV DX, 0		;//zero upper byte, again
+	XOR DX, DX		;//zero upper byte, again
 	MOV BX, 2		;//multiply by 3/2 as each FAT entry is 12 bits each, with two entries packed into three bytes
 	DIV BX
 	MOV SI, AX
@@ -143,7 +141,7 @@ EVEN:
 	SHR AX, 4		;//low nibble is part of another entry
 	;//fallthrough, but it makes no difference anyways. 
 ODD:
-	AND AX, 0x0FFF		;//high nibble is part of another entry
+	AND AX, 0x0FFF		;//high nibble is part of another entry if odd (the even fallthrough is unaffected)
 	CMP AX, 0x0FF0
 	JGE ENTER
 	MOV [KERNCLUST], AX
@@ -154,13 +152,13 @@ LBACHS:
 	;//puts CHS parameters in the right place for INT 0x13 to use
 	PUSH BX		;//put away BX as a garbage register
 	;//there seems to be a problem here
-	MOV DX, 0	;//ensure high word is not set else 32-bit division
+	XOR DX, DX	;//ensure high word is not set else 32-bit division
 	MOV BX, 18	;//sectors per track - some memory clashes happen here that need to be sorted out!
 			;//methinks the BIOS parameter block is overwritten by the stack. 
 	DIV BX		;//remainder ranges between 0 and 17 (DX = sector - 1)
 	INC DX		;//add 1 to make it 1-18 for proper addressing
 	MOV CL, DL	;//put in place
-	MOV DX, 0	;//ensure high word is not set, else 32-bit division
+	XOR DX, DX	;//ensure high word is not set, else 32-bit division
 	MOV BX, 2	;//calculate head and cylidner
 	DIV BX		;//double-sided hence the divide
 	MOV DH, DL	;//remainder is the head (where we are supposed to be), 0 or 1
@@ -169,75 +167,9 @@ LBACHS:
 	POP BX		;//restore old BX
 	RET		;//bye
 
-BPRINT:
-	MOV AH, 0x0E	;//AH=0x0E, print to screen
-	LODSB		;//MOV AL, [DS:SI]; INC SI
-	CMP AL, 0	;//assuming null-terminated string
-	JE .BPRINTDONE	;//if it is, end
-	INT 0x10	;//write to screen
-	JMP BPRINT	;//loop for next character
-.BPRINTDONE:
-	RET		;//quick end
 ENTER:			;//fixme fixme fixme
-	;//A20 line
-	IN AL, 0x93
-	OR AL, 2
-	AND AL, 0xFE
-	OUT 0x92, AL	;//FAST A20 (supported on all >PS/2 systems including PC/AT and PC/XT)
-	LGDT [GDTADDR]	;//load the GDT
-	MOV AX, 0x28	;//0x5*0x8=0x28, 5th GDT entry
-	LTR AX		;//establish 1st task to be executed
-	MOV EAX, 0x10	;//second segment (DATASEG RPL=0)
-	MOV DS, EAX
-	MOV ES, EAX
-	MOV SS, EAX
-	MOV EAX, 0	;//Unused registers
-	MOV FS, EAX
-	MOV GS, EAX
-	MOV EAX, CR0
-	OR EAX, 1
-	MOV CR0, EAX	;//Pray
-BITS 32
-	JMP 0x0:0x1000
-BITS 16
-FLOPPYERROR:	DB "Floppy error!", 0
+	JMP 0x1000
 KERNCLUST:	DW 0
 KERNFNAME:	DB "KERNEL  BIN"
-GDT: 
-	DQ 0
-; actual entries
-	;//CODESEG(DPL=0)
-	DW 0xFFFF
-	DW 0x0000
-	DW 0x9A00
-	DW 0x00CF
-	;//DATASEG(DPL=0)
-	DW 0XFFFF
-	DW 0x0000
-	DW 0x9200
-	DW 0x00CF
-	;//CODESEG(DPL=3)
-	DW 0xFFFF
-	DW 0x0000
-	DW 0xFA00
-	DW 0x00CF
-	;//DATASEG(DPL=3)
-	DW 0xFFFF
-	DW 0x0000
-	DW 0xF200
-	DW 0x00CF
-	;//TSS
-	DW ENDTSS-TSS
-	DW TSS
-	DW 0x8900
-	DW 0x00CF
-LENGDT: 
-GDTADDR:
-	DW LENGDT - GDT
-	DD GDT
-;//we need 68 bytes for our TSS and frankly idk if we have it.
-TSS:			;//temporary TSS to stop us triple faulting 
-TIMES 0x68 DB 0
-ENDTSS:
 TIMES 510 - ($-$$) DB 0 
 DW 0xAA55 
