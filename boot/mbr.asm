@@ -6,6 +6,8 @@
 ;//This bootloader is not ready to be run on a physical system. This comment may be removed later.
 ;//Until then, run this at your own risk. If you understand the code, read it, paying particular attention to disk I/O. 
 ;//It is however worth noting that this code is perfectly safe to run on a virtual system.
+;//ADDENDUM I - loading checks
+;//it appears that this code struggles to load the GDT. I have no idea why. 
 ;//Yours truly, 
 ;//Vedant G, Singapore, 22:22 UTC+08 2023-11-23.
 BITS 16
@@ -22,7 +24,7 @@ RESERVEDSECTORS: DW 1		;//that's us!
 NUMBEROFFATS: DB 2		;//as is standard on all FAT12 systems
 ROOTDIRENTRIES: DW 224		;//total theoretical root dir entries.
 SECTORS: DW 2880		;//Total sectors
-MEDIADESCRIPTOR: DB 0xF0
+MEDIADESCRIPTOR: DB 0xF0	;//am floppy
 SECTORSPERFAT: DW 9
 ;//end DOS 2.0 BPB
 ;//begin DOS 3.31 BPB 
@@ -30,8 +32,8 @@ SECTORSPERTRACK: DW 18
 HEADS: DW 2
 HIDDENSECTORS: DD 0
 LARGESECTORS: DD 0
-DRIVENO: DB 0			;//am floppy
-EXTBOOTSIGNATURE: DB 0x29	;//am floppy!!1!!!1!
+DRIVENO: DB 0			;//am floppy!!
+EXTBOOTSIGNATURE: DB 0x29	;//AM FLOPPY!!1!!!1!
 SERIAL: DD 0xACDC		;//yes
 LABEL: DB "VOSFLOPPY  "		;//volume label ALWAYS 11 CHARS
 FILESYSTEM: DB "FAT12   "
@@ -41,7 +43,6 @@ BEGIN:
 	MOV SS, AX
 	MOV AX, 0x7000		;//stack grows directly below us
 	MOV SP, AX
-	CLD			;//stack (and searches) incrementing upwards towards us
 	STI			;//0xC00 bytes = 12 * 256 = 3096 bytes of stack should be plenty
 
 	;//reset the floppy system
@@ -170,21 +171,75 @@ LBACHS:
 	RET		;//bye
 
 BPRINT:
+	PUSH AX		;//bprint clobbers AX
+.BPRINTLOOP:
 	MOV AH, 0x0E	;//AH=0x0E, print to screen
 	LODSB		;//MOV AL, [DS:SI]; INC SI
 	CMP AL, 0	;//assuming null-terminated string
 	JE .BPRINTDONE	;//if it is, end
 	INT 0x10	;//write to screen
-	JMP BPRINT	;//loop for next character
+	JMP .BPRINTLOOP	;//loop for next character
 .BPRINTDONE:
+	POP AX
 	RET		;//quick end
 ENTER: 
-	JMP 0x100:0	;//go!
+	CLI
+	HLT		;//to debug the computer
+	;//enable A20 line before protected mode switching
+	CALL PS2COMAWAIT
+	MOV AL, 0xd0	;//read from status buffer
+	OUT 0x64, AL	;//send command
+	IN AL, 0x60	;//read
+	CALL PS2DATAAWAIT
+	OR AL, 0x02	;//A20 line enable
+	SHL AX, 8	;//result in AH
+	CALL PS2COMAWAIT;//wait
+	MOV AL, 0xD1	;//write output register
+	OUT 0x64, AL	;//send command to 8042 PS/2 controller
+	SHR AX, 8	;//put original status register back
+	CALL PS2COMAWAIT;//wait
+	OUT 0x60, AL	;//send new output register to I/O port
+	PUSH CS
+	POP DS		;//CS=DS
+	LIDT [IDTR]	;//load IDT with offset 0, length 0, one gate with contents P=0 (no interrupt handlers).
+	LGDT [GDTR]	;//load GDT with dummy registers
+	MOV EAX, CR0
+	OR EAX, 1
+	MOV CR0, EAX
+	JMP 0x8:0x1000	;//go!
 ;//data area
 FLOPPYERROR:	DB "Floppy error!", 0
 KERNCLUST:	DW 0
 KERNFNAME:	DB "KERNEL  BIN"
-BUF:
-TIMES 510 - ($-$$) DB 0 
-DW 0xAA55		;//magic number for bootsector at 0x200
-
+IDTR:	DW 0
+	DD 0		;//dummy IDT
+GDT:
+	DQ 0
+	DW 0xFFFF
+	DW 0x0000
+	DW 0x9A00
+	DW 0x00C0
+	DW 0xFFFF
+	DW 0x0000
+	DW 0x9200
+	DW 0x00C0
+GDTR:
+	DW $-GDT
+	DD GDT
+PS2COMAWAIT:
+	PUSH AX		;//PS2COMAWAIT clobbers AX
+	IN AL, 0x64	;//receive status register.
+	TEST AL, 2	;//test bit at 0x02
+	JZ COMREADY	;//if zero, go to common RET routine in BPRINT.
+	JMP PS2COMAWAIT	;//loop. If it hangs, then the 8042 controller is destroyed anyway so it's pointless
+PS2DATAAWAIT:	
+	PUSH AX
+	IN AL, 0x64
+	TEST AL, 1
+	JZ COMREADY
+	JMP PS2DATAAWAIT
+COMREADY:	
+	POP AX
+	RET 
+	TIMES 510 - ($-$$) DB 0	;//pad to 510 bytes (1 sector - bootsector magic number) 
+	DW 0xAA55		;//magic number for bootsector at 0x200. Actually 0x55 0xaa but NASM packs as little endian. 
