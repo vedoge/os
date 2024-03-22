@@ -35,7 +35,8 @@
 *.i*86
 *.x86_64
 *.hex
-
+# Flat binaries
+*.bin
 # Debug files
 *.dSYM/
 *.su
@@ -54,3 +55,5 @@ dkms.conf
 #floppy images
 *.img
 *.iso
+# Vim swp files
+*.swp
