@@ -184,8 +184,9 @@ BPRINT:
 	RET		;//quick end
 ENTER: 
 	CLI
-	HLT		;//to debug the computer
 	;//enable A20 line before protected mode switching
+	;//this method interfaces with the PS/2 controller in the computer to do things to magically turn on the A20. 
+	;//idk how it works tho
 	CALL PS2COMAWAIT
 	MOV AL, 0xd0	;//read from status buffer
 	OUT 0x64, AL	;//send command
@@ -201,6 +202,16 @@ ENTER:
 	OUT 0x60, AL	;//send new output register to I/O port
 	PUSH CS
 	POP DS		;//CS=DS
+	MOV EAX, 0xDEADBEEF
+	MOV WORD [FFFF:0010], AX
+	MOV BX, WORD [0000:0000]
+	CMP AX, BX
+	JNE .WORKED
+	;//probably no A20 line
+	MOV SI, NOA20
+	CALL BPRINT
+	CLI
+	HLT
 	LIDT [IDTR]	;//load IDT with offset 0, length 0, one gate with contents P=0 (no interrupt handlers).
 	LGDT [GDTR]	;//load GDT with dummy registers
 	MOV EAX, CR0
@@ -241,5 +252,7 @@ PS2DATAAWAIT:
 COMREADY:	
 	POP AX
 	RET 
+NOA20:
+	DB "A20 LINE ENABLE FAIL"
 	TIMES 510 - ($-$$) DB 0	;//pad to 510 bytes (1 sector - bootsector magic number) 
 	DW 0xAA55		;//magic number for bootsector at 0x200. Actually 0x55 0xaa but NASM packs as little endian. 
