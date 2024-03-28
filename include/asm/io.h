@@ -1,4 +1,4 @@
-#define _KERNEL32_H
+#define _IO_H
 #define inb(port,val) /* receive input from the port "port" in "val" */ \
 	asm volatile (	"inb %%dx, %%al;"  	\
 			:"=a" (val)		/* map al to var that stores it is the value being received */ \
