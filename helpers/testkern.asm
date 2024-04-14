@@ -34,6 +34,10 @@ org 0x1000
 	call vgaprint
 	add esp, 4
 	pop ebp
+;//load IDT
+;//load page tables
+;//load kernel
+;//set up multitasking, enable interrupts, switch
 	hlt
 ;//vga print
 vgaprint:				;//void vgaprint(const char * str)
