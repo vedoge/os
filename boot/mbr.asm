@@ -63,7 +63,8 @@ BEGIN:
 	MOV AL, 14
 	XOR BX, BX		;//ES:BX = 07E0:0000 (0x7E00), first free block of memory
 	INT 0x13
-	JNC READROOT		;//if no error, proceed. 
+	JNC READROOTDIR		;//if no error, proceed. 
+
 	MOV AX, CS
 	MOV DS, AX
 	MOV SI, FLOPPYERROR	;//floppy error string
@@ -72,7 +73,7 @@ BEGIN:
 	HLT
 
 
-READROOT:
+READROOTDIR:
 	PUSH CS
 	POP DS			;//ensure CS=DS (for proper addressing of the kernel filename at DS:SI)
 	MOV AX, 0x07E0
@@ -88,6 +89,7 @@ SEARCHKERN:
 	XCHG CX, DX		;//exchange loop indices (entry is stored safely in DX, while CX is used by REP)
 REP	CMPSB			;//compare the CX characters at DS:SI and ES:DI
 	JE LOADFAT		;//exit the loop if equal (we have a match safely in ES:DI)
+
 	POP AX			;//if not, prepare to offset the index.
 	ADD AX, 32
 	MOV DI, AX		;//next entry
@@ -100,22 +102,28 @@ LOADFAT:
 	CALL LBACHS		;//fill in CHS table
 	MOV AH, 2		;//read sectors from drive
 	MOV AL, 9		;//9 sectors per FAT
-	PUSH 0x09A0		;//0x7E00 (first available offset) + 0x1C00 (length of root dir) gives 0x9A00 as FAT address
-	POP ES			;//load the FAT into memory at 0x9A00
-	XOR BX, BX		;//BX=0 so ES:BX points to the point right after us
+	MOV BX, 0x09A0		;//0x7E00 (first available offset) + 0x1C00 (length of root dir) gives 0x9A00 as FAT address
+	MOV ES, BX		;//load the FAT into memory at 0x9A00
+	XOR BX, BX
 	INT 0x13
 SETUPKERN:
 	;//define the segmentation of the kernel. 
 	PUSH ES
 	POP DS
-	PUSH 0x100		;//0x1000 - first address free
-	POP ES
+	MOV AX, 0x100		;//0x9A00 + 0x9*0x200=0xAC00 which is first address after FAT
+	MOV ES, AX		;//ES=buffer address segment (ES:BX is the buffer address pointer for INT 0x13)
 	XOR BX, BX		;//ensure buffer address pointer is set to 0 (kernel size limit of 640KiB) 
 LOADKERN:
-	MOV AX, WORD [KERNCLUST];//for the loop
+	;//FIXME FIXME FIXME
+	;//me, 10:15 pm: It appears to be a problem with this function somehow. My loop appears to break. 
+	;//TODO TODO TODO 
+	;//I'll work this out tomorrow. Right now, no bren. 
+	;//Me, signing off. 
+	MOV AX, WORD [KERNCLUST]	;//for the loop
 	PUSH AX			;//save for later
-	ADD AX, 34		;//offset to cope with the way our offset calculates (addr 35 = first data sector)
+	ADD AX, 34		;//offset to cope with the way LBACHS calculates (LBA 35 = first data sector)
 	CALL LBACHS		;//put things in the right places
+				;//bx is missing, find it
 	MOV AH, 0x02
 	MOV AL, 0x01
 	INT 0x13
@@ -180,7 +188,7 @@ ENTER:
 	;//this method interfaces with the PS/2 controller in the computer to do things to magically turn on the A20. 
 	;//idk how it works tho
 	CALL PS2COMAWAIT
-	MOV AL, 0xD0	;//read from status buffer
+	MOV AL, 0xd0	;//read from status buffer
 	OUT 0x64, AL	;//send command
 	IN AL, 0x60	;//read
 	CALL PS2DATAAWAIT
@@ -194,13 +202,9 @@ ENTER:
 	OUT 0x60, AL	;//send new output register to I/O port
 	PUSH CS
 	POP DS		;//CS=DS
-	PUSH 0x0000
-	PUSH 0xFFFF
-	MOV AX, 0xBEEF
-	POP ES
-	MOV WORD [ES:0010], AX
-	POP ES
-	MOV BX, WORD [ES:0000]
+	MOV EAX, 0xDEADBEEF
+	MOV WORD [FFFF:0010], AX
+	MOV BX, WORD [0000:0000]
 	CMP AX, BX
 	JNE .WORKED
 	;//probably no A20 line
@@ -208,8 +212,6 @@ ENTER:
 	CALL BPRINT
 	CLI
 	HLT
-.WORKED:
-	CLI
 	LIDT [IDTR]	;//load IDT with offset 0, length 0, one gate with contents P=0 (no interrupt handlers).
 	LGDT [GDTR]	;//load GDT with dummy registers
 	MOV EAX, CR0
