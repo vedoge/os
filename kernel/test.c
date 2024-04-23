@@ -1,4 +1,5 @@
 #include <vga.h>
+const uint8_t VGA_ROWS, VGA_COLS;
 int main () {
 	const char * thing = "hello world!";
 	int length = strlen(thing);

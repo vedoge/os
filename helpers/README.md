@@ -11,4 +11,5 @@ Use your native compiler, not the cross-compiler (NOT `i386-elf` but `your-syste
 This program doesn't agree _per se_ with what was written above, but it is a simple flat binary piece of test code. 
 It is assembled with `nasm -f bin` and is placed in the kernel directory as `KERNEL  BIN`. 
 Please note that this may stop working with future versions of the bootloader. To this end, I may come back later rewrite this later.
+# NB This file is, for now, part of the actual operating system. It may return in the future. 
 ***
