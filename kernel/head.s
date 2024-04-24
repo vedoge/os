@@ -26,8 +26,8 @@ _entry:
 	//set up IDT
 	movl
 	movl $0x0fff, %edi
-	movl $0x0fff, %ecx	//fff dwords (4092 bytes)
-	movl $0x2, %eax		//no page directory (P=0)
+	movl $0x0fff, %ecx
+	movl $0x2, %eax		//no page directory
 rep 	stosd
 	//our page directory now contains 1024 not-present tables
 	//from 0x0000 to 0x0fff
