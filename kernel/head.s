@@ -16,34 +16,34 @@ _entry:
 	inb $0xa0, %al		//save the sub PIC's identity
 	push %eax		//on the stack
 	movb  $1, %al		//ICW1: INIT, ICW4_PRESENT
-	outb $0x20, %al		//send out
+	outb %al, $0x20		//send out
 	nop; nop		//delay so things are ready
-	outb $0xa0, %al		//send to sub PIC
+	outb %al, $0xa0		//send to sub PIC
 	nop; nop 
 	movb $0x20, %al		//ICW2: vector offset
-	outb $0x21, %al		//send the vector offset to the dom PIC
+	outb %al, $0x21		//send the vector offset to the dom PIC
 	or $0xf, %eax		//add for the vector offset of sub PIC
-	outb $0xa1, %al		//send to sub PIC
+	outb %al, $0xa1		//send to sub PIC
 	nop; nop
 				//ICW3: IDENTITY
 	movb $0x04, %al
-	outb $0x21, %al		//tell dom PIC its identity and where its sub PIC is
+	outb %al, $0x21		//tell dom PIC its identity and where its sub PIC is
 	nop; nop
 	movb $0x02, %al		//sub PIC
-	outb $0xa1, %al		//haha u r not dom PIC
+	outb %al, $0xa1		//haha u r not dom PIC
 	nop; nop
 	pop %eax
-	outb $0xa1, %al	
+	outb %al, $0xa1		//restore the identities
 	nop; nop
 	pop %eax
-	outb $0x21, %al
+	outb %al, $0x21		//restore the identity things
 	nop; nop
 	//PICs are now configured 
 	//set up IDT
 	movl $0x0fff, %edi	//fill up 1000 bytes
 	movl %edi, %ecx		//for performance / size reasons
 	movl $0x2, %eax		//no page directory
-rep 	stosd			//throwing it at memory
+rep 	stosl			//throwing it at memory
 	//our page directory now contains 1024 not-present tables
 	//from 0x0000 to 0x0fff
 	cld			//makes maths easier
@@ -52,28 +52,19 @@ rep 	stosd			//throwing it at memory
 	mov -0x1000(%edi), %eax
 	shr $0x10, %eax
  	or $3, %eax
-rep	stosd			//first entry (first page) is present
-	or $0x1, ($0x0)
+rep	stosl			//first entry (first page) is present
+	orl $0x1, ($0x0)
 	xor %eax, %eax
 	movl %eax, %cr3		//load cr3 with our page directory offset (0)
 	movl %cr0, %eax 	//load the machine status dword
 	or $0x80000000, %eax	//PG_ENABLE
 	movl %eax, %cr0		//put it back so changes are in effect
-	jmp *pg_enabled		//make sure paging is enabled
+	ljmp *pg_enabled		//make sure paging is enabled
 pg_enabled:
 	//main will set up interrupts and drivers for us, possibly
 	//otherwise, we're more or less done here
-	//move the GDT to where it should be (0x2000, overwriting the first portion of this code) 
-	sgdt [gdtr]
-	movzwd [gdtr+4], %ecx
-	movl [gdtr], %esi
-	movl $0x2000, %edi
-	movl %edi, [gdtr]
-	shl %ecx, 2		//get dwords. If this discards bits then we have other problems
-rep movsd
-	ldgt [gdtr]		//load the gdt in its rightful place (MAY NEED FIXING)
 idt: .fill 1024, 0		//1024 IDT addresses with no interrupts
-idtr: 	dd idt
-	dw $-idtr
-gdtr:	.dword 0	
+idtr: 	.long idt
+	.word $-idtr
+gdtr:	.long 0	
 	.word 0
