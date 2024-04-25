@@ -102,24 +102,19 @@ LOADFAT:
 	CALL LBACHS		; fill in CHS table
 	MOV AH, 2		; read sectors from drive
 	MOV AL, 9		; 9 sectors per FAT
-	MOV BX, 0x09A0		; 0x7E00 (first available offset) + 0x1C00 (length of root dir) gives 0x9A00 as FAT address
-	MOV ES, BX		; load the FAT into memory at 0x9A00
-	XOR BX, BX
+	PUSH 0x09A0		; 0x7E00 (first available offset) + 0x1C00 (length of root dir) gives 0x9A00 as FAT address
+	POP ES			; load the FAT into memory at 0x9A00
+	XOR BX, BX		; buffer address pointer now goes to the right place
 	INT 0x13
 SETUPKERN:
 	; define the segmentation of the kernel. 
-	PUSH ES
+	PUSH ES			; ES = DS for comparing strings
 	POP DS
-	MOV AX, 0x200		; load starting at addr 0x2000
-	MOV ES, AX		; ES=buffer address segment (ES:BX is the buffer address pointer for INT 0x13)
+	PUSH 0x200		; load starting at addr 0x2000
+	POP ES			; ES:BX is the buffer pointer for INT 13h (also where the kernel goes)
 	XOR BX, BX		; ensure buffer address pointer is set to 0 (kernel size limit of 640KiB) 
 LOADKERN:
-	; FIXME FIXME FIXME
-	; me, 10:15 pm: It appears to be a problem with this function somehow. My loop appears to break. 
-	; TODO TODO TODO 
-	; I'll work this out tomorrow. Right now, no bren. 
-	; Me, signing off. 
-	MOV AX, WORD [KERNCLUST]	; for the loop
+	MOV AX, WORD [KERNCLUST]; for the loop
 	PUSH AX			; save for later
 	ADD AX, 34		; offset to cope with the way LBACHS calculates (LBA 35 = first data sector)
 	CALL LBACHS		; put things in the right places
@@ -188,7 +183,7 @@ ENTER:
 	; this method interfaces with the PS/2 controller in the computer to do things to magically turn on the A20. 
 	; idk how it works tho
 	CALL PS2COMAWAIT
-	MOV AL, 0xd0	; read from status buffer
+	MOV AL, 0xD0	; read from status buffer
 	OUT 0x64, AL	; send command
 	IN AL, 0x60	; read
 	CALL PS2DATAAWAIT
@@ -213,14 +208,14 @@ ENTER:
 	MOV SI, NOA20
 	CALL BPRINT
 	CLI
-	HLT
+	; HLT		; debugging purposes
 	LIDT [IDTR]	; load IDT with offset 0, length 0, one gate with contents P=0 (no interrupt handlers).
 	LGDT [GDTR]	; load GDT with dummy registers
 .WORKED:
 	MOV EAX, CR0
-	OR EAX, 1
-	MOV CR0, EAX
-	JMP 0x8:0x1000	; go!
+	OR EAX, 1	;PE=1 (protection enable) 
+	MOV CR0, EAX	
+	JMP 0x8:0x1000	; go! perform a long jump to the starting address with the CODESEG selected
 ; data area
 FLOPPYERROR:	DB "Floppy error!", 0
 KERNCLUST:	DW 0
@@ -257,5 +252,6 @@ COMREADY:
 	RET 
 NOA20:
 	DB "A20 LINE ENABLE FAIL"
+				; if the A20 line fails to enable the routine should catch it and print this 
 	TIMES 510 - ($-$$) DB 0	; pad to 510 bytes (1 sector - bootsector magic number) 
 	DW 0xAA55		; magic number for bootsector at 0x200. Actually 0x55 0xaa but NASM packs as little endian. 
