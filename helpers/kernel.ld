@@ -1,6 +1,6 @@
 ENTRY(_entry)
 SECTIONS {
-	. = 0x00002000
+	. = 0x00002000;
 	.text BLOCK(4K) : ALIGN(4K) {
 		*(.text)
 	}
