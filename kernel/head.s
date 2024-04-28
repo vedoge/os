@@ -1,3 +1,5 @@
+.globl	_entry
+.type	_entry, @function 
 _entry:
 	//this file is written as the start of the kernel. 
 	//we are currently at offset 0x2000 (todo), so page tables won't overwrite us.
@@ -53,7 +55,7 @@ rep 	stosl			//throwing it at memory
 	shr $0x10, %eax
  	or $3, %eax
 rep	stosl			//first entry (first page) is present
-	orl $0x1, ($0x0)
+	orl $0x1, (0x0)
 	xor %eax, %eax
 	movl %eax, %cr3		//load cr3 with our page directory offset (0)
 	movl %cr0, %eax 	//load the machine status dword
@@ -65,6 +67,6 @@ pg_enabled:
 	//otherwise, we're more or less done here
 idt: .fill 1024, 0		//1024 IDT addresses with no interrupts
 idtr: 	.long idt
-	.word $-idtr
+	.word .-idtr
 gdtr:	.long 0	
 	.word 0
