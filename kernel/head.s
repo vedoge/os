@@ -2,7 +2,7 @@
 .type	_entry, @function 
 _entry:
 	//this file is written as the start of the kernel. 
-	//we are currently at offset 0x2000, so page tables won't overwrite us.
+	//we are currently at offset 0x2000 (todo), so page tables won't overwrite us.
 	//our job is to initialise a dummy IDT (drivers will put themselves into
 	//the IDT as they please)
 	//we will also reprogram the 8259s, and point them to interrupt vectors
@@ -21,6 +21,7 @@ _entry:
 	outb %al, $0x20		//send out
 	nop; nop		//delay so things are ready
 	outb %al, $0xa0		//send to sub PIC
+	nop; nop 
 	movb $0x20, %al		//ICW2: vector offset
 	outb %al, $0x21		//send the vector offset to the dom PIC
 	or $0xf, %eax		//add for the vector offset of sub PIC
@@ -40,11 +41,7 @@ _entry:
 	outb %al, $0x21		//restore the identity things
 	nop; nop
 	//PICs are now configured 
-
 	//set up IDT
-	lidt ($idtr)		//load a dummy IDT
-	//I'll assume stuff will set itself up as it pleases
-	//set up paging
 	movl $0x0fff, %edi	//fill up 1000 bytes
 	movl %edi, %ecx		//for performance / size reasons
 	movl $0x2, %eax		//no page directory
@@ -58,22 +55,18 @@ rep 	stosl			//throwing it at memory
 	shr $0x10, %eax
  	or $3, %eax
 rep	stosl			//first entry (first page) is present
-	orl $0x1, (0x0)		//set P=1 for the first page directory entry
-	xor %eax, %eax		//our page directory offset
+	orl $0x1, (0x0)
+	xor %eax, %eax
 	movl %eax, %cr3		//load cr3 with our page directory offset (0)
-
 	movl %cr0, %eax 	//load the machine status dword
 	or $0x80000000, %eax	//PG_ENABLE
 	movl %eax, %cr0		//put it back so changes are in effect
-
-	ljmp *pg_enabled	//flush the prefetch queue (no longer valid)
-	//we will triple fault if something goes wrong here
-	//todo get this to actually worked
+	ljmp *pg_enabled		//make sure paging is enabled
 pg_enabled:
 	//main will set up interrupts and drivers for us, possibly
 	//otherwise, we're more or less done here
 idt: .fill 1024, 0		//1024 IDT addresses with no interrupts
-idtr: 	.long idt		//starting address of IDT
-	.word idtr-idt		//length of IDT in bytes
+idtr: 	.long idt
+	.word .-idtr
 gdtr:	.long 0	
 	.word 0
