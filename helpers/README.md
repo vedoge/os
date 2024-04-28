@@ -8,6 +8,7 @@ Run this on your host system if you want to see it working.
 Use your native compiler, not the cross-compiler (NOT `i386-elf` but `your-system's-triplet`) and check the output, if you would like, against parts commented in the source code. For easy serching, grep "GENERATED" and look in each file.
 ***
 - Helper program #1: kernel.ld
-This file contains the linker directives to link a proper kernel.
-# NB This file is, for now, part of the actual operating system. It may return in the future. 
+  This file contains the linker directives to link a proper kernel.
+  It has our kernel origin and the order of sections laid out. It also has a custom entry symbol, defined as `_entry`, found in entry.c. 
+  # This file is not part of the operating system. It does, however, help build it. 
 ***
