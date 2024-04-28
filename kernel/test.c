@@ -6,6 +6,7 @@ int main () {
 	unsigned char h = 'h';
 	vga_putchar((unsigned char) 'h',(uint8_t) VGA_ATTRIB(VGA_BLINK | VGA_BLACK, VGA_BRIGHT | VGA_WHITE), (uint8_t) 0, (uint8_t) 0);
 	vga_puts(thing, (uint8_t) VGA_ATTRIB(VGA_BLINK | VGA_BLACK, VGA_BRIGHT | VGA_WHITE), (uint8_t) 0, (uint8_t) 0);
+	asm("cli;hlt");
 	return 0;
 }
 
