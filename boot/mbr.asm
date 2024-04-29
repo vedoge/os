@@ -6,8 +6,6 @@
 ; This bootloader is not ready to be run on a physical system. This comment may be removed later.
 ; Until then, run this at your own risk. If you understand the code, read it, paying particular attention to disk I/O. 
 ; It is however worth noting that this code is perfectly safe to run on a virtual system.
-; ADDENDUM I - loading checks
-; it appears that this code struggles to load the GDT. I have no idea why. 
 ; Yours truly, 
 ; Vedant G, Singapore, 22:22 UTC+08 2023-11-23.
 BITS 16
@@ -73,110 +71,6 @@ BEGIN:
 	HLT
 
 
-READROOTDIR:
-	PUSH CS
-	POP DS			; ensure CS=DS (for proper addressing of the kernel filename at DS:SI)
-	MOV AX, 0x07E0
-	MOV ES, AX		; 07E0:0000 (0x7E00)
-	XOR DI, DI
-	MOV CX, [ROOTDIRENTRIES]; loop through all the root entries available (224 in this case) 
-	MOV AX, 0		; AX is our offset
-
-SEARCHKERN:
-	PUSH AX			; store offset at beginning of code
-	MOV SI, KERNFNAME	; DS:SI contains reference string, ES:DI points to root dir.
-	MOV DX, 11
-	XCHG CX, DX		; exchange loop indices (entry is stored safely in DX, while CX is used by REP)
-REP	CMPSB			; compare the CX characters at DS:SI and ES:DI
-	JE LOADFAT		; exit the loop if equal (we have a match safely in ES:DI)
-
-	POP AX			; if not, prepare to offset the index.
-	ADD AX, 32
-	MOV DI, AX		; next entry
-	XCHG CX, DX		; external index (looping through the root directory entries themselves)
-LOOP	SEARCHKERN
-LOADFAT:
-	MOV AX, [ES:DI+0xF]	; 11 (file length) + 15 (random info) = 26 (cluster offset)
-	MOV [KERNCLUST], AX 	; save the kernel cluster in memory
-	MOV AX, 1		; logical sector 2 - first sector of fat copy #1
-	CALL LBACHS		; fill in CHS table
-	MOV AH, 2		; read sectors from drive
-	MOV AL, 9		; 9 sectors per FAT
-	PUSH 0x09A0		; 0x7E00 (first available offset) + 0x1C00 (length of root dir) gives 0x9A00 as FAT address
-	POP ES			; load the FAT into memory at 0x9A00
-	XOR BX, BX		; buffer address pointer now goes to the right place
-	INT 0x13
-SETUPKERN:
-	; define the segmentation of the kernel. 
-	PUSH ES			; ES = DS for comparing strings
-	POP DS
-	PUSH 0x100		; load starting at addr 0x1000
-	POP ES			; ES:BX is the buffer pointer for INT 13h (also where the kernel goes)
-	XOR BX, BX		; ensure buffer address pointer is set to 0 (kernel size limit of 640KiB) 
-LOADKERN:
-	MOV AX, WORD [KERNCLUST]; for the loop
-	PUSH AX			; save for later
-	ADD AX, 34		; offset to cope with the way LBACHS calculates (LBA 35 = first data sector)
-	CALL LBACHS		; put things in the right places
-				; bx is missing, find it
-	MOV AH, 0x02
-	MOV AL, 0x01
-	INT 0x13
-	ADD BX, 0x200		; bump buffer address pointer by 512 bytes
-	POP AX
-	PUSH BX
-	MOV DX, 0		; zero upper byte
-	MOV BX, 3
-	MUL BX
-	MOV DX, 0		; zero upper byte, again
-	MOV BX, 2		; multiply by 3/2 as each FAT entry is 12 bits each, with two entries packed into three bytes
-	DIV BX
-	MOV SI, AX
-	MOV AX, [DS:SI]		; for copying and comparing
-	CMP DX, 0
-	JNZ ODD
-EVEN:
-	SHR AX, 4		; low nibble is part of another entry
-	; fallthrough, but it makes no difference anyways. 
-ODD:
-	AND AX, 0x0FFF		; high nibble is part of another entry
-	CMP AX, 0x0FF0
-	JGE ENTER
-	MOV [KERNCLUST], AX
-	POP BX			; restore old value of BX for the buffer address pointer
-	JMP LOADKERN 
-LBACHS:	
-	; function is specific to 3.5" diskette format and must be modified to fit larger and more general disks. 
-	; puts CHS parameters in the right place for INT 0x13 to use
-	PUSH BX		; put away BX as a garbage register
-	; there seems to be a problem here
-	MOV DX, 0	; ensure high word is not set else 32-bit division
-	MOV BX, 18	; sectors per track - some memory clashes happen here that need to be sorted out!
-			; methinks the BIOS parameter block is overwritten by the stack. 
-	DIV BX		; remainder ranges between 0 and 17 (DX = sector - 1)
-	INC DX		; add 1 to make it 1-18 for proper addressing
-	MOV CL, DL	; put in place
-	MOV DX, 0	; ensure high word is not set, else 32-bit division
-	MOV BX, 2	; calculate head and cylidner
-	DIV BX		; double-sided hence the divide
-	MOV DH, DL	; remainder is the head (where we are supposed to be), 0 or 1
-	MOV CH, AL	; quotient is our cylinder (how far out we are supposed to be)
-	XOR DL, DL	; zero real quick
-	POP BX		; restore old BX
-	RET		; bye
-
-BPRINT:
-	PUSH AX		; bprint clobbers AX
-.BPRINTLOOP:
-	MOV AH, 0x0E	; AH=0x0E, print to screen
-	LODSB		; MOV AL, [DS:SI]; INC SI
-	CMP AL, 0	; assuming null-terminated string
-	JE .BPRINTDONE	; if it is, end
-	INT 0x10	; write to screen
-	JMP .BPRINTLOOP	; loop for next character
-.BPRINTDONE:
-	POP AX
-	RET		; quick end
 ENTER: 
 	CLI
 	; enable A20 line before protected mode switching
