@@ -215,7 +215,7 @@ ENTER:
 	MOV EAX, CR0
 	OR EAX, 1	;PE=1 (protection enable) 
 	MOV CR0, EAX
-	JMP 0x8:0x1000	; go! perform a long jump to the starting address with the CODESEG selected
+	JMP 0x8:0x2000	; go! perform a long jump to the starting address with the CODESEG selected
 ; data area
 FLOPPYERROR:	DB "Floppy error!", 0
 KERNCLUST:	DW 0
