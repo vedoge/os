@@ -110,7 +110,7 @@ SETUPKERN:
 	; define the segmentation of the kernel. 
 	PUSH ES			; ES = DS for comparing strings
 	POP DS
-	PUSH 0x100		; load starting at addr 0x1000
+	PUSH 0x200		; load starting at addr 0x2000
 	POP ES			; ES:BX is the buffer pointer for INT 13h (also where the kernel goes)
 	XOR BX, BX		; ensure buffer address pointer is set to 0 (kernel size limit of 640KiB) 
 LOADKERN:
@@ -201,7 +201,6 @@ ENTER:
 	PUSH 0xFFFF
 	POP ES
 	MOV WORD [ES:0010], AX
-			; probably not the best idea to be using memory address 0000, but oh well
 	MOV BX, WORD [DS:0000]
 	CMP AX, BX
 	JNE .WORKED
@@ -209,10 +208,10 @@ ENTER:
 	MOV SI, NOA20
 	CALL BPRINT
 	CLI
-	HLT		; debugging purposes
-.WORKED:
+	; HLT		; debugging purposes
 	LIDT [IDTR]	; load IDT with offset 0, length 0, one gate with contents P=0 (no interrupt handlers).
 	LGDT [GDTR]	; load GDT with dummy registers
+.WORKED:
 	MOV EAX, CR0
 	OR EAX, 1	;PE=1 (protection enable) 
 	MOV CR0, EAX	
