@@ -1,4 +1,5 @@
-ENTRY(_entry)
+OUTPUT_FORMAT(binary) 
+# ENTRY(_entry)
 SECTIONS {
 	. = 0x00002000;
 	.text BLOCK(4K) : ALIGN(4K) {

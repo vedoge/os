@@ -1,8 +1,14 @@
 .globl	_entry
 .type	_entry, @function 
+/*
+.extern div_zero, step, nmi, breakpoint, bound, instr_inval, x87_absent
+.extern double_fault, segment_overrun, tss_inval, segment_absent
+.extern overflow, gpf, page_fault,  x87_err
+*/
+.org 0x4000
 _entry:
 	//this file is written as the start of the kernel. 
-	//we are currently at offset 0x2000 (todo), so page tables won't overwrite us.
+	//we are currently at offset 0x4000 (todo), so page tables won't overwrite us.
 	//our job is to initialise a dummy IDT (drivers will put themselves into
 	//the IDT as they please)
 	//we will also reprogram the 8259s, and point them to interrupt vectors
@@ -17,7 +23,7 @@ _entry:
 	push %eax		//on the stack
 	inb $0xa0, %al		//save the sub PIC's identity
 	push %eax		//on the stack
-	movb  $1, %al		//ICW1: INIT, ICW4_PRESENT
+	movb  $0x11, %al	//ICW1_INIT|ICW4_PRESENT
 	outb %al, $0x20		//send out
 	nop; nop		//delay so things are ready
 	outb %al, $0xa0		//send to sub PIC
@@ -61,12 +67,6 @@ rep	stosl			//first entry (first page) is present
 	movl %cr0, %eax 	//load the machine status dword
 	or $0x80000000, %eax	//PG_ENABLE
 	movl %eax, %cr0		//put it back so changes are in effect
-	ljmp *pg_enabled		//make sure paging is enabled
-pg_enabled:
-	//main will set up interrupts and drivers for us, possibly
-	//otherwise, we're more or less done here
-idt: .fill 1024, 0		//1024 IDT addresses with no interrupts
-idtr: 	.long idt
-	.word .-idtr
+	ljmp *main		//go!
 gdtr:	.long 0	
 	.word 0
