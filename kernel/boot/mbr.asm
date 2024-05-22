@@ -48,20 +48,17 @@ BEGIN:
 	; reset the floppy system
 	XOR AH, AH		; reset
 	XOR DL, DL		; drive 0
+
 	INT 0x13
 
-	PUSH BX
-	MOV AX, [SECTORSPERFAT]	; sectors taken up by 1 FAT
-	MOV BX, [NUMBEROFFATS]	; sectors per FAT * number of FATS = total sectors taken up by FATS
-	MUL BX			; I don't think multiplication can be done with [mem16] unless imul is used, sooo
-	INC AX			; +1 for the boot sector
-	POP BX			; restore old value of BX
-	CALL LBACHS		; convert into params for INT 0x13
-	MOV AX, 0x07E0		
-	MOV ES, AX		; set up memory
-	MOV AH, 0x02
-	MOV AL, 14
+	PUSH 0x7E0
+	POP ES
 	XOR BX, BX		; ES:BX = 07E0:0000 (0x7E00), first free block of memory
+
+	MOV AX, 0x13		; sector 19
+	CALL LBACHS
+	MOV AH, 0x02		; read sectors
+	MOV AL, 14		; 14 sectors
 	INT 0x13
 	JNC READROOTDIR		; if no error, proceed. 
 
@@ -76,8 +73,6 @@ BEGIN:
 READROOTDIR:
 	PUSH CS
 	POP DS			; ensure CS=DS (for proper addressing of the kernel filename at DS:SI)
-	MOV AX, 0x07E0
-	MOV ES, AX		; 07E0:0000 (0x7E00)
 	XOR DI, DI
 	MOV CX, [ROOTDIRENTRIES]; loop through all the root entries available (224 in this case) 
 	XOR AX, AX		; AX is our offset
@@ -96,9 +91,12 @@ REP	CMPSB			; compare the CX characters at DS:SI and ES:DI
 	XCHG CX, DX		; external index (looping through the root directory entries themselves)
 LOOP	SEARCHKERN
 LOADFAT:
+	CLI
+	HLT
+	STI
 	MOV AX, [ES:DI+0xF]	; 11 (file length) + 15 (random info) = 26 (cluster offset)
 	MOV [KERNCLUST], AX 	; save the kernel cluster in memory
-	MOV AX, 1		; logical sector 2 - first sector of fat copy #1
+	MOV AX, 1		; logical sector 1 - first sector of fat copy #1
 	CALL LBACHS		; fill in CHS table
 	MOV AH, 2		; read sectors from drive
 	MOV AL, 9		; 9 sectors per FAT
@@ -108,28 +106,31 @@ LOADFAT:
 	INT 0x13
 SETUPKERN:
 	; define the segmentation of the kernel. 
-	PUSH ES			; ES = DS for comparing strings
-	POP DS
 	PUSH 0x400		; load starting at addr 0x4000
-	POP ES			; ES:BX is the buffer pointer for INT 13h (also where the kernel goes)
+	POP ES
+	PUSH CS
+	POP DS
 	XOR BX, BX		; ensure buffer address pointer is set to 0 (kernel size limit of 640KiB) 
 LOADKERN:
 	MOV AX, WORD [KERNCLUST]; for the loop
 	PUSH AX			; save for later
-	ADD AX, 34		; offset to cope with the way LBACHS calculates (LBA 35 = first data sector)
+
+	ADD AX, 34		; offset to cope with the way LBACHS calculates (LBA 34 = first data sector)
 	CALL LBACHS		; put things in the right places
-				; bx is missing, find it
+
 	MOV AH, 0x02
 	MOV AL, 0x01
 	INT 0x13
+
+	HLT
+
 	ADD BX, 0x200		; bump buffer address pointer by 512 bytes
 	POP AX
 	PUSH BX
 	XOR DX, DX		; zero upper byte
 	MOV BX, 3
 	MUL BX
-	MOV DX, 0		; zero upper byte, again
-	MOC BX, 2
+	MOV BX, 2
 	DIV BX
 	MOV SI, AX
 	MOV AX, [DS:SI]		; for copying and comparing
@@ -210,12 +211,14 @@ ENTER:
 	CLI
 	HLT		; debugging purposes
 .WORKED:
-	LIDT [IDTR]	; load IDT with offset 0, length 0, one gate with contents P=0 (no interrupt handlers).
-	LGDT [GDTR]	; load GDT with dummy registers
-	MOV EAX, CR0
-	OR EAX, 1	;PE=1 (protection enable) 
-	MOV CR0, EAX
-	JMP 0x8:0x4000	; go! perform a long jump to the starting address with the CODESEG selected
+;	LIDT [IDTR]	; load IDT with offset 0, length 0, one gate with contents P=0 (no interrupt handlers).
+;	LGDT [GDTR]	; load GDT with dummy registers
+;	MOV EAX, CR0
+;	OR EAX, 1	;PE=1 (protection enable) 
+;	MOV CR0, EAX
+;	JMP 0x8:0x4000	; go! perform a long jump to the starting address with the CODESEG selected
+	JMP 0x400:0	;go to memory address 0x4000
+
 ; data area
 FLOPPYERROR:	DB "Floppy error!", 0
 KERNCLUST:	DW 0
