@@ -6,8 +6,6 @@
 ; This bootloader is not ready to be run on a physical system. This comment may be removed later.
 ; Until then, run this at your own risk. If you understand the code, read it, paying particular attention to disk I/O. 
 ; It is however worth noting that this code is perfectly safe to run on a virtual system.
-; ADDENDUM I - loading checks
-; it appears that this code struggles to load the GDT. I have no idea why. 
 ; Yours truly, 
 ; Vedant G, Singapore, 22:22 UTC+08 2023-11-23.
 BITS 16
@@ -77,9 +75,9 @@ READROOTDIR:
 	MOV CX, [ROOTDIRENTRIES]; loop through all the root entries available (224 in this case) 
 	XOR AX, AX		; AX is our offset
 
-SEARCHKERN:
+SEARCHSTAGE:
 	PUSH AX			; store offset at beginning of code
-	MOV SI, KERNFNAME	; DS:SI contains reference string, ES:DI points to root dir.
+	MOV SI, STAGEFNAME	; DS:SI contains reference string, ES:DI points to root dir.
 	MOV DX, 11
 	XCHG CX, DX		; exchange loop indices (entry is stored safely in DX, while CX is used by REP)
 REP	CMPSB			; compare the CX characters at DS:SI and ES:DI
@@ -89,63 +87,62 @@ REP	CMPSB			; compare the CX characters at DS:SI and ES:DI
 	ADD AX, 32
 	MOV DI, AX		; next entry
 	XCHG CX, DX		; external index (looping through the root directory entries themselves)
-LOOP	SEARCHKERN
+LOOP	SEARCHSTAGE
 LOADFAT:
-	CLI
-	HLT
-	STI
 	MOV AX, [ES:DI+0xF]	; 11 (file length) + 15 (random info) = 26 (cluster offset)
-	MOV [KERNCLUST], AX 	; save the kernel cluster in memory
-	MOV AX, 1		; logical sector 1 - first sector of fat copy #1
-	CALL LBACHS		; fill in CHS table
+	PUSH AX
+	MOV AX, 1
+	CALL LBACHS
 	MOV AH, 2		; read sectors from drive
 	MOV AL, 9		; 9 sectors per FAT
 	PUSH 0x09A0		; 0x7E00 (first available offset) + 0x1C00 (length of root dir) gives 0x9A00 as FAT address
 	POP ES			; load the FAT into memory at 0x9A00
 	XOR BX, BX		; buffer address pointer now goes to the right place
 	INT 0x13
-SETUPKERN:
+SETUPSTAGE:
 	; define the segmentation of the kernel. 
-	PUSH 0x400		; load starting at addr 0x4000
-	POP ES
-	PUSH CS
+	PUSH ES
 	POP DS
+	PUSH 0x400
+	POP ES
 	XOR BX, BX		; ensure buffer address pointer is set to 0 (kernel size limit of 640KiB) 
-LOADKERN:
-	MOV AX, WORD [KERNCLUST]; for the loop
-	PUSH AX			; save for later
 
-	ADD AX, 34		; offset to cope with the way LBACHS calculates (LBA 34 = first data sector)
+LOADSTAGE:
+	POP AX
+	PUSH AX
+
+	ADD AX, 31		; offset to cope with the way LBACHS calculates (LBA 34 = first data sector)
 	CALL LBACHS		; put things in the right places
 
 	MOV AH, 0x02
 	MOV AL, 0x01
 	INT 0x13
 
-	HLT
-
 	ADD BX, 0x200		; bump buffer address pointer by 512 bytes
+
 	POP AX
+
 	PUSH BX
 	XOR DX, DX		; zero upper byte
 	MOV BX, 3
 	MUL BX
 	MOV BX, 2
 	DIV BX
+	POP BX
+
 	MOV SI, AX
 	MOV AX, [DS:SI]		; for copying and comparing
-	CMP DX, 0
-	JNZ ODD
-EVEN:
+	OR DX, 0
+	JZ EVEN
+ODD:
 	SHR AX, 4		; low nibble is part of another entry
 	; fallthrough, but it makes no difference anyways. 
-ODD:
+EVEN:
 	AND AX, 0x0FFF		; high nibble is part of another entry
 	CMP AX, 0x0FF0
 	JGE ENTER
-	MOV [KERNCLUST], AX
-	POP BX			; restore old value of BX for the buffer address pointer
-	JMP LOADKERN 
+	PUSH AX			; save cluster for next iteration
+	JMP LOADSTAGE 
 LBACHS:	
 	; function is specific to 3.5" diskette format and must be modified to fit larger and more general disks. 
 	; puts CHS parameters in the right place for INT 0x13 to use
@@ -196,48 +193,17 @@ ENTER:
 	SHR AX, 8	; put original status register back
 	CALL PS2COMAWAIT; wait
 	OUT 0x60, AL	; send new output register to I/O port
-	PUSH CS
-	POP DS		; CS=DS
-	MOV AX, 0xBEEF
-	PUSH 0xFFFF
-	POP ES
-	MOV WORD [ES:0010], AX
-	MOV BX, WORD [DS:0000]
-	CMP AX, BX
-	JNE .WORKED
-	; probably no A20 line
-	MOV SI, NOA20
-	CALL BPRINT
-	CLI
-	HLT		; debugging purposes
-.WORKED:
 ;	LIDT [IDTR]	; load IDT with offset 0, length 0, one gate with contents P=0 (no interrupt handlers).
 ;	LGDT [GDTR]	; load GDT with dummy registers
 ;	MOV EAX, CR0
 ;	OR EAX, 1	;PE=1 (protection enable) 
 ;	MOV CR0, EAX
 ;	JMP 0x8:0x4000	; go! perform a long jump to the starting address with the CODESEG selected
-	JMP 0x400:0	;go to memory address 0x4000
+	JMP 0x0:0x4000	;go to memory address 0x4000
 
 ; data area
 FLOPPYERROR:	DB "Floppy error!", 0
-KERNCLUST:	DW 0
-KERNFNAME:	DB "STAGE2  BIN"
-IDTR:	DW 0
-	DD 0		; dummy IDT
-GDT:
-	DQ 0
-	DW 0xFFFF
-	DW 0x0000
-	DW 0x9A00
-	DW 0x00C0
-	DW 0xFFFF
-	DW 0x0000
-	DW 0x9200
-	DW 0x00C0
-GDTR:
-	DW $-GDT
-	DD GDT
+STAGEFNAME:	DB "STAGE2  BIN"
 PS2COMAWAIT:
 	PUSH AX		; PS2COMAWAIT clobbers AX
 	IN AL, 0x64	; receive status register.
