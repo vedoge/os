@@ -9,39 +9,11 @@ pic2_data	equ 0xa1
 
 
 ; data area
-FNAME: DB "KERNEL  BIN", 0
+FNAME: DB "KERNEL  BIN"
 CLUST: DW 0
-ROOTDIRENTRIES EQU 224
-gdt:
-	DQ 0
-
-	DW 0xFFFF
-	DW 0x0000
-	DW 0x9A00
-	DW 0x00C0
-
-	DW 0xFFFF
-	DW 0x0000
-	DW 0x9200
-	DW 0x00C0
-
-	DW 0xFFFF
-	DW 0x0000
-	DW 0xFA00
-	DW 0x00C0
-
-	DW 0xFFFF
-	DW 0x0000
-	DW 0xF200
-	DW 0x00C0
-
-	; need task state segment
-gdtr:
-	dw $-gdt
-	dd gdt
-
-idtr:	dw 0
-	dq 0
+; general definitions
+stage2_base	equ 0x4000
+ROOTDIRENTRIES	EQU 224
 ; elf definitions
 
 ; ELF header
@@ -90,19 +62,18 @@ sh_entsize	equ 0x16
 entry16:
 ; copied from the bootloader
 ; load the kernel image proper at 0x8000 (temporary location)
-	hlt
 READROOTDIR:
+	PUSH 0x07E0
+	POP ES
 	PUSH CS
 	POP DS			; ensure CS=DS (for proper addressing of the kernel filename at DS:SI)
-	PUSH 0x07E0		; tables still in place from bootloader.
-	POP ES
-	XOR DI, DI
-	MOV CX, ROOTDIRENTRIES	; loop through all the root entries available (224 in this case) 
+	XOR DI, DI		; ES:DI
+	MOV CX, ROOTDIRENTRIES; loop through all the root entries available (224 in this case) 
 	XOR AX, AX		; AX is our offset
 
 SEARCH:
 	PUSH AX			; store offset at beginning of code
-	MOV SI, FNAME		; DS:SI contains reference string, ES:DI points to root dir.
+	MOV SI, FNAME	; DS:SI contains reference string, ES:DI points to root dir.
 	MOV DX, 11
 	XCHG CX, DX		; exchange loop indices (entry is stored safely in DX, while CX is used by REP)
 REP	CMPSB			; compare the CX characters at DS:SI and ES:DI
@@ -115,64 +86,51 @@ REP	CMPSB			; compare the CX characters at DS:SI and ES:DI
 LOOP	SEARCH
 LOADFAT:
 	MOV AX, [ES:DI+0xF]	; 11 (file length) + 15 (random info) = 26 (cluster offset)
-	MOV [CLUST], AX 	; save the kernel cluster in memory
-	MOV AX, 0x9A0		; 0x7E00 (first available offset) + 0x1C00 (length of root dir) gives 0x9A00 as FAT address
-	POP ES			; FAT is in memory at 0x9a00 (loaded earlier by bootloader)
+	PUSH AX
 SETUP:
 	; define the segmentation of the kernel. 
-	PUSH ES			; ES = DS for comparing strings
-	POP DS
-	PUSH 0x1000		; load starting at addr 0x10000 (clear of the FAT)
-	POP ES			; ES:BX is the buffer pointer for INT 13h (also where the kernel goes)
-	XOR BX, BX		; ensure buffer address pointer is set to 0 (kernel size limit of 64KiB) 
+	PUSH 0x09A0		; FAT location
+	POP DS			; in DS
+	PUSH 0xB00		; kernel loaded at b000(610 kb limit)
+	POP ES			; in ES
+	XOR BX, BX		; buffer address pointer is ES:0
+
 LOAD:
-	MOV AX, WORD [CLUST]	; for the loop
-	PUSH AX			; save for later
-	ADD AX, 34		; offset to cope with the way LBACHS calculates (LBA 35 = first data sector)
+	POP AX
+	PUSH AX
+
+	ADD AX, 31		; offset to cope with the way LBACHS calculates (LBA 34 = first data sector)
 	CALL LBACHS		; put things in the right places
+
 	MOV AH, 0x02
 	MOV AL, 0x01
 	INT 0x13
-	ADD BX, 0x200		; increment buffer address pointer by 512 bytes
+
+	ADD BX, 0x200		; bump buffer address pointer by 512 bytes
+
 	POP AX
+
 	PUSH BX
 	XOR DX, DX		; zero upper byte
 	MOV BX, 3
 	MUL BX
-	MOV DX, 0		; zero upper byte, again
 	MOV BX, 2
 	DIV BX
+	POP BX
+
 	MOV SI, AX
 	MOV AX, [DS:SI]		; for copying and comparing
-	CMP DX, 0
-	JNZ ODD
-EVEN:
+	OR DX, 0
+	JZ EVEN
+ODD:
 	SHR AX, 4		; low nibble is part of another entry
 	; fallthrough, but it makes no difference anyways. 
-ODD:
+EVEN:
 	AND AX, 0x0FFF		; high nibble is part of another entry
-	CMP AX, 0x0FF0		; any FAT entry that's above 0xfef is invalid; assume it's EOF
-	JGE LOADED		; we're done
-	MOV [CLUST], AX		; otherwise prpare for loop
-	POP BX			; restore old value of BX for the buffer address pointer
+	CMP AX, 0x0FF0
+	JGE LOADED
+	PUSH AX			; save cluster for next iteration
 	JMP LOAD 
-LOADED:				; kernel is loaded - we just need to arrange it in memory using the ELF headers
-	; jump into protected mode
-	; put the gdt into place
-	; page
-	; put the elf into a loadable format
-	; jump there
-
-;------------------------------------------------------------------------------
-	lgdt [gdtr] 
-;------------------------------------------------------------------------------
-	lidt [idtr]
-;------------------------------------------------------------------------------
-	mov eax, cr0
-	or eax, 1
-	mov cr0, eax
-;------------------------------------------------------------------------------
-	jmp 0x8:start		; reload CS and begin execution in 32-bit mode
 LBACHS:	
 	; function is specific to 3.5" diskette format and must be modified to fit larger and more general disks. 
 	; puts CHS parameters in the right place for INT 0x13 to use
@@ -192,19 +150,31 @@ LBACHS:
 	XOR DL, DL	; zero real quick
 	POP BX		; restore old BX
 	RET		; bye
-bits 32
-message:
-	db "h", 0x7f,"e", 0x7f, "l", 0x7f, "l", 0x7f, "o", 0x7f, "!", 0x7f, 0, 0
 
-vgaprint:
-	mov edi, 0xb8000
-	xor ecx, ecx
-	not ecx
-repnz	movsb
-	ret
-	
-start:
+
+LOADED:				; kernel is loaded - we just need to arrange it in memory using the ELF headers
+	; jump into protected mode
+	; put the gdt into place
+	; page
+	; put the elf into a loadable format
+	; jump there
 	cli
+	push 0
+	pop ds
+	push ds			; whoops - forgot these! Doesn't work otherwise :)
+	pop es
+;------------------------------------------------------------------------------
+	lidt [idtr]
+;------------------------------------------------------------------------------
+	lgdt [gdtr] 
+;------------------------------------------------------------------------------
+	mov eax, cr0
+	or eax, 1
+	mov cr0, eax
+;------------------------------------------------------------------------------
+	jmp 0x8:start		; reload CS and begin execution in 32-bit mode
+bits 32
+start:
 	mov eax, 0x10		; segment selectors
 	mov ds, eax
 	mov es, eax
@@ -212,12 +182,8 @@ start:
 	mov ss, eax
 	mov esi, message
 	call vgaprint
-	hlt
 	; PIC initialisation
-	in al, pic1_data
-	push eax
-	in al, pic2_data
-	push eax
+	; PIC masks are not saved as they will be masked and set up later
 	mov al, 0x11 		; ICW1_INIT | ICW1_ICW4
 	out pic1_com, al
 	jmp $+2
@@ -257,26 +223,65 @@ start:
 	jmp $+2
 	jmp $+2
 	out pic2_data, al	;same for pic2
-	pop eax
-	out pic2_data, al
-	pop eax
-	out pic1_data, al
+align 	4			; something something funky pointer arithmetic
+pg_overwrite_limit:		; maximum offset that the page table can overwrite
 ; paging code
-	mov edi, 0x0fff
-	mov eax, 0x02
+	std			; ensure that rep stosd goes downwards in memory (faster and easier to process)
+	mov edi, 0x3ffc
+	mov eax, 0x00000002
 	mov ecx, edi
-rep	stosw
-	; the range 0x0000-0x0fff now contains 1000 not-present page tables
-	mov edi, 0x1000
-	mov ecx, 0x01ff
-	add edi, ecx
-	; we need to fill it with (0x0-0x1ff) shifted right 4 nibbles with the last byte marked present
-.ptloop:
-	mov eax, ecx
-	shr eax, 16
-	stosw
-	loop .ptloop
+	shr ecx, 2		; ecx = ecx div 4
+	inc ecx			; include 0th entry
+rep	stosd			; rep stosd
+	; the range 0x0000-0x0fff now contains 1000 not-present page directory entries
+	mov edi, pg_overwrite_limit
+	mov ecx, edi
+	sub ecx, stage2_base
+	shr ecx, 2
 
+	; store the memory address that will be mapped to 0xb8000 (VGA page)
+	shl ecx, 12		; shift left to give memory address from index
+	mov dword [vga_off], ecx
+	shr ecx, 12 		; undo the shift
+
+	inc ecx			; for entry 0
+.loop:
+	mov eax, ecx
+	dec eax			; so 0x0 is mapped to 0x0 and not 0x1000
+	shl eax, 12		; 3 nibbles left (eax = ecx * 4KiB)
+	or eax, 0x03		; mark present and writable
+	stosd
+	loop .loop
+	cli
+	
+;	hlt			; NOTE DEBUGGING STOP
+	mov dword [pg_overwrite_limit], 0xb8003
+
+	; we need to fill it with the corresponding memory addresses
+	; this is a fine way of doing it imho - the PIC code alone is 70 bytes. 
+	; the PIC stuff alone gives us enough space to identity page 
+	; from 0x0 to 0x11000 (which is enough for now). 
+	; my educated guess is that there's 300 bytes of code above us,
+	; which should map everything from 0x0 to 0x4b000 (which EVERY OS has)
+	; additionally, a page must be reserved for the VGA system at 0xb8000
+	; further map reservations should probably be made by most OSes from 
+	; BIOS/CMOS/Multiboot memory maps 
+	; but that's mostly for things that we won't interfere with
+	; as a simple embedded system, so i'll ignore it for now. 
+	; We'll later remap some of low memory up to 0xC0000000 (higher half)
+	; for simplicity, but for now it's not worth the hassle
+	; we identity page the first few KiB of memory to remove the need
+	; to translate virtual addresses to physical ones in assembly, 
+	; but C should deal with this just fine. 
+	; note- addresses 0x00000000-0x00044000 are available and id paged
+	; (~1/3rd the real address space). 
+	; address 0x00045000 is mapped to the VGA page at phys. 0xb8000. 
+	; the kernel will upon initialisation fill this section with pages
+	; until 0x5000, which gives us memory access until 0x0040'0000 
+	; (4 MiB), and map itself to 0xC0000000 (higher half) 
+	mov eax, 0x4000		; address of first page table
+	or eax, 3		; present, rw
+	mov dword [ds:0], eax		; place in page directory
 	mov ecx, cr3
 	xor ecx, ecx
 	mov cr3, ecx		; flush tlb
@@ -285,8 +290,38 @@ rep	stosw
 	mov cr0, eax		; PG_ENABLE
 	jmp 0x8:pg_enabled
 pg_enabled:
+	cli
+	; map VGA to address
+	mov esi, message
+	call vgaprint
 	hlt
+message:
+	db "h", 0x8f,"e", 0x8f, "l", 0x8f, "l", 0x8f, "o", 0x8f, "!", 0x8f, 0, 0
 
+vgaprint:
+	push eax
+	push edx
+	mov eax, [.idx]
+	mov edx, [vga_off]
+	lea edi, [edx+eax*2]
+	xor ecx, ecx
+	not ecx
+	cld
+.loop:
+	lodsw
+	cmp ax, 0
+	je .done
+	stosw
+	inc word [.idx]
+	loop .loop
+.done:
+	neg ecx
+	dec ecx
+	pop edx
+	pop eax
+	std
+	ret
+.idx:	dw 0
 %if 0				; "multiline comment" 
 pic1_com	equ 0x20
 pic1_data	equ 0x21
@@ -315,4 +350,34 @@ verify		equ 0x16
 scan_le		equ 0x19
 scan_he		equ 0x1d
 %endif
+gdt:
+	DQ 0
 
+	DW 0xFFFF
+	DW 0x0000
+	DW 0x9A00
+	DW 0x00C0
+
+	DW 0xFFFF
+	DW 0x0000
+	DW 0x9200
+	DW 0x00C0
+
+	DW 0xFFFF
+	DW 0x0000
+	DW 0xFA00
+	DW 0x00C0
+
+	DW 0xFFFF
+	DW 0x0000
+	DW 0xF200
+	DW 0x00C0
+; need task state segment
+gdtr:
+	dw gdtr-gdt-1
+	dd gdt
+
+idtr:	dw 0
+	dq 0
+vga_off: dd 0xb8000
+end:
