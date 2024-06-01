@@ -1,5 +1,5 @@
 bits 16
-org 0x4000
+org 0xC000
 jmp entry16
 
 pic1_com	equ 0x20
@@ -13,7 +13,9 @@ FNAME: DB "KERNEL  BIN"
 CLUST: DW 0
 ; general definitions
 stage2_base	equ 0x4000
+pg_overwrite_limit equ 0xbffc
 ROOTDIRENTRIES	EQU 224
+kern_base	equ 0xbffc
 ; elf definitions
 
 ; ELF header
@@ -37,26 +39,26 @@ e_ehdrend	equ 0x34	; 52
 ; program header
 
 p_type		equ 0x0
-p_offset	equ 0x2
-p_vaddr		equ 0x6
-p_paddr		equ 0xa
-p_filesz	equ 0xe
-p_memsz		equ 0x10
-p_flags		equ 0x12
-p_align		equ 0x14
+p_offset	equ 0x4
+p_vaddr		equ 0x8
+p_paddr		equ 0xc
+p_filesz	equ 0x10
+p_memsz		equ 0x14
+p_flags		equ 0x18
+p_align		equ 0x1c
 
 ; section header
 
-sh_name		equ 0x0		; 0
-sh_type		equ 0x2		; 2
-sh_flags	equ 0x4		; 4
-sh_addr		equ 0x6		; 6
-sh_off		equ 0xa
-sh_size		equ 0xe
-sh_link		equ 0x10
-sh_info		equ 0x12
-sh_addralign	equ 0x14
-sh_entsize	equ 0x16
+;sh_name		equ 0x0		; 0
+;sh_type		equ 0x2		; 2
+;sh_flags	equ 0x4		; 4
+;sh_addr		equ 0x6		; 6
+;sh_off		equ 0xa
+;sh_size		equ 0xe
+;sh_link		equ 0x10
+;sh_info		equ 0x12
+;sh_addralign	equ 0x14
+;sh_entsize	equ 0x16
 
 
 entry16:
@@ -91,7 +93,7 @@ SETUP:
 	; define the segmentation of the kernel. 
 	PUSH 0x09A0		; FAT location
 	POP DS			; in DS
-	PUSH 0xB00		; kernel loaded at b000(610 kb limit)
+	PUSH 0x4000		; kernel loaded at 40000 (610 KiB limit)
 	POP ES			; in ES
 	XOR BX, BX		; buffer address pointer is ES:0
 
@@ -167,6 +169,8 @@ LOADED:				; kernel is loaded - we just need to arrange it in memory using the E
 	lidt [idtr]
 ;------------------------------------------------------------------------------
 	lgdt [gdtr] 
+;	cli
+;	hlt
 ;------------------------------------------------------------------------------
 	mov eax, cr0
 	or eax, 1
@@ -224,7 +228,6 @@ start:
 	jmp $+2
 	out pic2_data, al	;same for pic2
 align 	4			; something something funky pointer arithmetic
-pg_overwrite_limit:		; maximum offset that the page table can overwrite
 ; paging code
 	std			; ensure that rep stosd goes downwards in memory (faster and easier to process)
 	mov edi, 0x3ffc
@@ -239,11 +242,6 @@ rep	stosd			; rep stosd
 	sub ecx, stage2_base
 	shr ecx, 2
 
-	; store the memory address that will be mapped to 0xb8000 (VGA page)
-	shl ecx, 12		; shift left to give memory address from index
-	mov dword [vga_off], ecx
-	shr ecx, 12 		; undo the shift
-
 	inc ecx			; for entry 0
 .loop:
 	mov eax, ecx
@@ -255,8 +253,6 @@ rep	stosd			; rep stosd
 	cli
 	
 ;	hlt			; NOTE DEBUGGING STOP
-	mov dword [pg_overwrite_limit], 0xb8003
-
 	; we need to fill it with the corresponding memory addresses
 	; this is a fine way of doing it imho - the PIC code alone is 70 bytes. 
 	; the PIC stuff alone gives us enough space to identity page 
@@ -281,52 +277,138 @@ rep	stosd			; rep stosd
 	; (4 MiB), and map itself to 0xC0000000 (higher half) 
 	mov eax, 0x4000		; address of first page table
 	or eax, 3		; present, rw
-	mov dword [ds:0], eax		; place in page directory
+	mov dword [ds:0], eax	; place in page directory
+	mov eax, 0x8000
+	or eax, 3
+	mov dword [ds:4], eax
+	; load base of page directory into cr3
 	mov ecx, cr3
 	xor ecx, ecx
 	mov cr3, ecx		; flush tlb
+	; enable PG bit in cr0
 	mov eax, cr0
 	or eax, 0x80000000
 	mov cr0, eax		; PG_ENABLE
 	jmp 0x8:pg_enabled
 pg_enabled:
+	; if we page fault now, we're toast
+
 	cli
-	; map VGA to address
-	mov esi, message
+
+	mov esi, paged
 	call vgaprint
 	hlt
+
+	mov esi, 0x40000
+	mov edi, elf_mag
+	mov ecx, 4
+	rep cmpsb
+	jne noelf
+	mov eax, [esi+e_phoff-4]
+phdr:
+	add eax, 4
+	cmp eax, 1
+	je .loadseg
+	loopnz phdr		; null entry, ignore
+	; error- a segment that shouldn't be here
+.loadseg:
+
+	mov eax, [esi+e_phnum]
+	xor edx, edx 
+	mov ecx, [esi+e_phentsize]
+	mul ecx
+	mov ecx, eax
+
+noelf:
+
+	mov esi, elferror
+	call vgaprint
+
+	cli
+	hlt		; end
+
 message:
 	db "h", 0x8f,"e", 0x8f, "l", 0x8f, "l", 0x8f, "o", 0x8f, "!", 0x8f, 0, 0
 
+paged:	db "p", 0x8f, "a", 0x8f, "g", 0x8f, "e", 0x8f, "d", 0x8f, 0xa, 0x8f, 0, 0
+
+elferror:
+	db 'u', 0x8f, 'n', 0x8f, 'k', 0x8f, 'n', 0x8f, 'o', 0x8f, 'w', 0x8f
+	db 'n', 0x8f, ' ', 0x8f, 's', 0x8f, 'e', 0x8f, 'g', 0x8f, 'm', 0x8f
+	db 'e', 0x8f, 'n', 0x8f, 't', 0x8f, '!', 0x8f, 0, 0
+
+elf_mag:
+	db 0x7f, 'E', 'L', 'F' 
+
+
+
 vgaprint:
+	cli
 	push eax
-	push edx
+	push ebx
 	mov eax, [.idx]
-	mov edx, [vga_off]
-	lea edi, [edx+eax*2]
+	lea edi, [vga_off+eax*2]
 	xor ecx, ecx
 	not ecx
 	cld
 .loop:
+	
 	lodsw
 	cmp ax, 0
 	je .done
+	cmp al, 0xa
+	je .newline
 	stosw
 	inc word [.idx]
 	loop .loop
+
+.newline:
+
+;	hlt			; DEBUGGING STOP
+
+
+	mov eax, dword [.idx]
+	mov ebx, 80
+	xor edx, edx		; note: "div r/m32" uses edx:eax
+	div ebx			; as its implicit operand, so zero it.
+	cmp eax, 25		; end of screen
+
+;	cmovge eax, 0		; would simplify this structure, but cmovcc is
+				; P/K5+ only
+
+	jge .wrapscr		; print starting from next row col 0 again
+
+	add eax, 1		; next line (remainder is discarded)
+	mov ebx, 80
+	xor edx, edx
+
+	mul ebx			; need to zero edx here also for "mul r/m32"
+
+
+	lea edi, [vga_off+eax*2]; load our new pointer
+	mov dword [.idx], eax	; store as idx
+	loop vgaprint.loop	; affect ecx (count as character) 
+
+.wrapscr:
+	xor eax, eax
+	mov dword [.idx], eax
+	lea edi, [vga_off+eax*2]
+	loop vgaprint.loop		; clobber ecx (count as character)
+
 .done:
 	neg ecx
-	dec ecx
-	pop edx
+	dec ecx			; account for the -1
+
+	pop ebx			; also restore
 	pop eax
+
 	std
+
 	ret
-.idx:	dw 0
+.idx: dd 0
+
+
 %if 0				; "multiline comment" 
-pic1_com	equ 0x20
-pic1_data	equ 0x21
-pic2_com	equ 0xa0
-pic2_data	equ 0xa1
 
 read_track	equ 0x2
 specify		equ 0x3
@@ -379,5 +461,5 @@ gdtr:
 
 idtr:	dw 0
 	dq 0
-vga_off: dd 0xb8000
+vga_off equ 0xb8000
 end:

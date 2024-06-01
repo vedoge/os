@@ -25,11 +25,11 @@
 vga_putchar:
 	/* size_t vga_putchar (unsigned char uc, unsigned char attrib, uint8_t x, uint8_t y); */
 	/* returns number of characters actually printed */
-	pushl %ebp			/* save old stack frame */
+	push %ebp			/* save old stack frame */
 	movl %esp, %ebp			/* start new stack frame */
 
-	pushl %esi			/* store */
-	pushl %edi			/* callee-saved registers */
+	push %esi			/* store */
+	push %edi			/* callee-saved registers */
 
 	movb 20(%ebp), %ah		/* store y in ah */
 	movb 16(%ebp), %al		/*  store x in al */
@@ -46,10 +46,10 @@ vga_putchar:
 	
 strlen:
 	/* size_t strlen (const char * str); */
-	pushl %ebp
+	push %ebp
 	movl %esp, %ebp			/* start new stack frame */
 
-	pushl %esi			/* callee-saved register */
+	push %esi			/* callee-saved register */
 
 	movl 8(%ebp), %esi		/* get dword ptr to our string from old stack */
 	movl $-1, %ecx		/* -1 in 2's complement; maximum strlen of 2^32-1 */
@@ -70,11 +70,11 @@ repnz	scasb				/* scan for 0; decrement ecx */
 	ret				/* return */
 vga_puts:	
 	/* void vga_puts (char * str, unsigned char attrib, uint8_t x, uint8_t y); */	
-	pushl %ebp
+	push %ebp
 	movl %esp, %ebp			/* same old */
 
-	pushl %esi
-	pushl %edi			/* callee-saved registers */
+	push %esi
+	push %edi			/* callee-saved registers */
 
 	movb 20(%ebp), %ah		/* put the y-coordinate into edi for some pointer arithmetic */
 	movb 16(%ebp), %al		/* add x */
@@ -108,7 +108,7 @@ compute_vga_pointer:
 	/* al = x
 	   ah = y
 	   result in edi */
-	pushl %ebx
+	push %ebx
 
 	movzbl %al, %ebx
 	shl $8, %eax
