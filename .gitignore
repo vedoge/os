@@ -57,3 +57,5 @@ dkms.conf
 *.iso
 # Vim swp files
 *.swp
+.vscode/*
+
