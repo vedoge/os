@@ -57,5 +57,7 @@ dkms.conf
 *.iso
 # Vim swp files
 *.swp
+#vscode
 .vscode/*
-
+#compiled kernel executables
+kernel/main
