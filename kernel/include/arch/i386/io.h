@@ -5,8 +5,9 @@
 			:"d" (port) 		/* map the port to dx, as it is the port being listened to */ \
 			: 			/* no clobber */)
 #define outb(port, val) /* send value val to port port */ \
-	asm volatile (	"outb %%dx, %%al" \
-			:"=a" (val) 		/* val mapped to al (data being sent) */ \
-			: "a" (port) 		/* port mapped to dx (port in question) */ \
+	asm volatile (	"outb %%al, %%dx" \
+			:
+			: "d" (port) 		/* port mapped to dx (port in question) */ \
+			  "a" (val) 		/* val mapped to al (data being sent) */ \
 			:  		/* no clobber*/)
 
