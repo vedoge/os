@@ -23,3 +23,4 @@ scan_le		equ 0x19
 scan_he		equ 0x1d
 
 */
+#define __I82077A_H
