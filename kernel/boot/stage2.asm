@@ -277,18 +277,18 @@ pg_enabled:
 	; show something on screen (debugging purposes)
 	mov esi, paged
 	call vgaprint
-;	hlt			; debugging purposes
+;	hlt			; NOTE DEBUGGING STOP
 
 ; check elf magic number
-	mov esi, 0x40000
-	push esi
-	mov edi, elf_mag
-	mov ecx, 4
-	cld
-	rep cmpsb
+	mov esi, 0x40000	; location of file we loaded in RealMode
+	push esi 		; save it for later
+	mov edi, elf_mag	; elf magic number for comparing
+	cld			; compare forwards in memory
+	cmpsd			; speed
 	jne noelf
 	std
 	pop esi
+;	hlt			; NOTE DEBUGGING STOP
 ; prepare to loop through the program header table
 	movzx ecx, word [esi+e_phnum]
 	mov eax, [esi+e_phoff]	; store program header offset
@@ -301,33 +301,41 @@ phdr:
 	loopnz phdr		; null/unknown entry, ignore
 	; error- a segment that shouldn't be here
 .loadseg:
+	push ecx
+	push esi 
 	push dword [esi+p_align]
 	push dword [esi+p_memsz]
 	push dword [esi+p_vaddr]
 	call modify_page_table	; modify the page table to fit the kernel layout
-	
+
 	mov ebx, [esi+p_align]	; alignment (most probably, page alignment
 				; as specified in the linker script)
 	mov eax, [esi+p_filesz] 
 	xor edx, edx
 	mov ecx, 4
-	div ecx
+	div ecx			; need remainder in edx
 	mov ecx, eax
 	mov edi, [esi+p_vaddr]
 	mov esi, [esi+p_offset]
 	add esi, 0x40000
 	cld
-	rep movsd
+	rep movsd		; move in dwords
 	mov ecx, edx
 	rep movsb
 	std
-	cli
-	hlt
-	mov esi, 0x8048000
-	push 0x8
-	push dword [esi+e_entry]
-	retf
+	pop esi			; return to rightful place
+	pop ecx			; return loop index
+	loop physaddr		; next entry
+
+	mov esi, 0x40000
+	push 0x8		; code segment, DPL=0
+	push dword [esi+e_entry]; e_entry
+	retf			; far return (far calls triple fault for whatever reason)
 	
+
+; subroutines and data
+
+
 noelf:
 
 	mov esi, elferror
@@ -358,11 +366,13 @@ modify_page_table:
 	and eax,0x003ff000	; bits 21-12
 	shr eax, 12		; get page frame
 	mov ebx, dword [highest_phys_frame]
+				; assign to first unassigned physical frame
 	shl ebx, 12
 	push ecx
 	mov ecx, [.nr_pages]
+				; nr of pages to allocate for segment
 	lea edi, [eax*4+pt_ceil+4]
-.loop:			; allocate nr_pages
+.loop:				; allocate nr_pages
 	add ebx, 0x1000
 	mov eax, ebx		
 	or eax, 3		; present and writable
@@ -378,15 +388,15 @@ modify_page_table:
 	mov esp, ebp		; quickly clean up garbage on stack
 	pop ebp
 	std
-	ret
-.nr_pages: dd 0
+	ret 12			; free 12 bytes from stack (avail on 386+)
+.nr_pages: dd 0th		; store nr_pages to allocate per segment
 
 
 ; PMode data/subroutines area
 message:
-	db "h", 0x8f,"e", 0x8f, "l", 0x8f, "l", 0x8f, "o", 0x8f, "!", 0x8f, 0, 0
+	db "h", 0x8f,"e", 0x8f, "l", 0x8f, "l", 0x8f, "o", 0x8f, "!", 0x8f, 0xa, 0x8f, 0, 0
 
-paged:	db "p", 0x8f, "a", 0x8f, "g", 0x8f, "e", 0x8f, "d", 0x8f, 0xa, 0x8f, 0, 0
+paged:	db "p", 0x8f, "a", 0x8f, "g", 0x8f, "e", 0x8f, "d", 0x8f, 0xa, 0x8f, 0xa, 0x8f, 0, 0
 
 elferror:
 	db 'u', 0x8f, 'n', 0x8f, 'k', 0x8f, 'n', 0x8f, 'o', 0x8f, 'w', 0x8f
@@ -412,7 +422,7 @@ vgaprint:
 	lodsw
 	cmp ax, 0
 	je .done
-	cmp al, 0xa
+	cmp al, 0xa		;\n
 	je .newline
 	stosw
 	inc word [.idx]
