@@ -33,7 +33,7 @@ size_t vga_puts(const char * string, uint8_t attrib, uint8_t x, uint8_t y) {
 			update_cursor(index);
 			continue; 
 		}
-		index = index>=2000 ? 0 : index;		/* wrap around */ 
+		index = index >= (VGA_ROWS*VGA_COLS) ? 0 : index;		/* wrap around */ 
 		/* typecasting black magick incoming */
 		*(uint16_t *)(vga_buffer + index*2 + i*2) = (uint16_t)(*(string+i)) | ((uint16_t)(attrib) << 8);
 	}
