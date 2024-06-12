@@ -1,5 +1,5 @@
-#include "include/arch/i386/interrupts.h"
-#include "include/vga.h"
+#include <arch/i386/interrupts.h>
+#include <vga.h>
 extern idt_entry * interrupt_table asm("ivt"); /* ptr to ivt */
 void lidt(idt_entry * idt) {
 	idtr_t idtr;
