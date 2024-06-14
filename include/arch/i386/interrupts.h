@@ -17,7 +17,14 @@ typedef struct {
 	uint8_t  options_byte;	/* options */
 	uint16_t offset_high;	/* high word of ISR address */
 } __attribute__((packed)) idt_entry;
-typedef struct {uint32_t eip, cs, eflags, useresp, ss;} __attribute__((packed)) regs; 
+
+typedef struct {
+	uint32_t eip;
+ 	uint32_t cs;
+	uint32_t eflags;
+	uint32_t useresp;
+	uint32_t ss;
+} __attribute__((packed)) regs; 
 /* CPU saved regs */
 
 extern void lidt(idt_entry * idt);		/* load IDTR register */
