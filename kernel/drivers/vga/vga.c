@@ -1,5 +1,5 @@
-#include "vga.h"
-#include "arch/i386/io.h"
+#include <vga.h>
+#include <arch/i386/io.h>
 char * const vga_buffer = 0xb8000;		/* vga mmio address */
 static uint16_t index = 0;			/* where our cursor is atm - must implement wraparound */
 size_t strlen(const char * string) {
@@ -25,7 +25,7 @@ size_t strlen(const char * string) {
 	return --retval;
 	*/
 }
-size_t vga_puts(const char * string, uint8_t attrib, uint8_t x, uint8_t y) {
+size_t vga_puts(const char * string, uint8_t attrib) {
 	size_t i = 0;
 	for (; i <= strlen(string); i++) {
 		if (*(string+i) == '\n') {
@@ -49,8 +49,9 @@ void vga_putchar (uint8_t uc, uint8_t attrib, uint8_t x, uint8_t y) {
 }
 void update_cursor(uint16_t loc) {				/* move the cursor */
 	outb(0x3D4, 0x0F);
-	outb(0x3D5, (uint8_t) (loc & 0xFF));
+	outb(0x3D5, (uint8_t) (loc & 0xFF));			/* low byte */
 	outb(0x3D4, 0x0E);
-	outb(0x3D5, (uint8_t) ((loc >> 8) & 0xFF));
+	outb(0x3D5, (uint8_t) ((loc >> 8) & 0xFF));		/* high byte */
+	return;
 }
 
