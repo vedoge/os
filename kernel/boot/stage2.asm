@@ -325,7 +325,7 @@ phdr:
 	std
 	pop esi			; return to rightful place
 	pop ecx			; return loop index
-	loop physaddr		; next entry
+	loop phdr		; next entry
 
 	mov esi, 0x40000
 	push 0x8		; code segment, DPL=0
@@ -389,7 +389,7 @@ modify_page_table:
 	pop ebp
 	std
 	ret 12			; free 12 bytes from stack (avail on 386+)
-.nr_pages: dd 0th		; store nr_pages to allocate per segment
+.nr_pages: dd 00h		; store nr_pages to allocate per segment
 
 
 ; PMode data/subroutines area
