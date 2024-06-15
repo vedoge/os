@@ -3,7 +3,7 @@
 	asm volatile (	"inb %%dx, %%al"  								\
 			: "=a" (val)		/* map al to var that stores it is the value being received */ \
 			: "d" (port) 		/* map the port to dx, as it is the port being listened to */ \
-			: 			/* no clobber */; \
+			: 			/* no clobber */ \
 			)
 #define outb(port, val) /* send value val to port port */ \
 	asm volatile (	"outb %%al, %%dx" \
