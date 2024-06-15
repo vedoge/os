@@ -1,6 +1,6 @@
 #define __VGA_H
 #ifndef __STDINT_H
-#include "stdint.h"
+#include <stdint.h>
 #endif
 /* TODO use enum */
 #define VGA_BLACK	0x0
