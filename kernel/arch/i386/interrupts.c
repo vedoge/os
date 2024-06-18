@@ -1,6 +1,16 @@
 #include <arch/i386/interrupts.h>
-#include <vga.h>
-extern idt_entry * interrupt_table asm("ivt"); /* ptr to ivt */
+#ifndef __VGA_H
+#include <hw/vga/vga.h>
+#endif
+/* 
+ * whatever is commented out below was formerly used for testing,
+ * but is now superseded by an actual keyboard driver in i8042.c 
+ * that also implements the requisite ISR
+ */
+/*
+#include <hw/i8259/i8259.h>
+#include <arch/i386/io.h>
+*/
 void lidt(idt_entry * idt) {
 	idtr_t idtr;
 	idt_entry * ranger; 
@@ -16,25 +26,35 @@ void lidt(idt_entry * idt) {
 	return; 
 
 }
-void set_idt_entry(idt_entry * idt, uint8_t n, uint16_t selector, uint8_t dpl, uint8_t gate_type, void *off) {
-	__asm__ volatile ("cli":/*no output*/:/*no input*/:/*no clobber*/);
-	(idt+n*8)->offset_low = (uint16_t)((uint32_t)off & 0xffff);	/*low word */
-	(idt+n*8)->offset_high = (uint16_t)((uint32_t)off >> 16);	/* high word */
-	(idt+n*8)->reserved = 0;		/* DO NOT TOUCH */
-	(idt+n*8)->selector = selector;		/* selector*/
-	(idt+n*8)->options_byte = (1<<7) | (dpl << 5) | gate_type;
-	/* asm ("sti") */
+void set_idt_entry(idt_entry * idt, uint16_t selector, uint8_t dpl, uint8_t gate_type, void *off) {
+	idt->offset_low = (uint16_t)((uint32_t)off & 0xffff);	/*low word */
+	idt->offset_high = (uint16_t)((uint32_t)off >> 16);	/* high word */
+	idt->reserved = 0;		/* DO NOT TOUCH */
+	idt->selector = selector;		/* selector*/
+	idt->options_byte = (1<<7) | (dpl << 5) | gate_type;
 	return;
 }
-__attribute__((interrupt)) void generic_interrupt_handler(regs * u)
+__attribute__((interrupt)) void generic_interrupt_handler(isr_savedregs * u)
 {
-	__asm__ volatile ("hlt");
-	vga_puts("helo\n",0x8f);
+	/* __asm__ volatile ("hlt"); */
+	vga_puts("Interrupt\n",0x4f);
 	return;
 }
-void init_interrupts(idt_entry * idt) {
-	for(int i = 0; i < NR_INTERRUPTS; i++) {
-		set_idt_entry(idt, i, 0x8, 0x0, 0xe, &generic_interrupt_handler);
+void init_interrupts(idt_entry *  const idt) {
+	for(int i = 0; i <= NR_INTERRUPTS; i++) {
+		set_idt_entry((idt+i),0x8, 0x0, INTERRUPT_GATE, &generic_interrupt_handler);
 	}
-	lidt(idt);
 }
+/* 
+ * whatever is below was formerly used for testing, but is now superseded
+ * by an actual keyboard driver under i8042.c that also implements 
+ * the requisite ISR
+ */
+/*
+__attribute__((interrupt)) void kbd_interrupt_handler(isr_savedregs * u) {
+	uint8_t garbag;
+	inb (0x64,garbag);
+	vga_puts("Keyboard interrupt\n",0x5f);
+	eoi(1);
+}
+*/
