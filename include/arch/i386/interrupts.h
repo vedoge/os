@@ -1,10 +1,13 @@
 #define __INTERRUPTS_H
-#include "stdint.h"
-
-#define NR_INTERRUPTS 256	/* max number of interrupts (int 0x0-0xff) */
-
+#ifndef __STDINT_H
+#include <stdint.h>
+#endif
+#ifndef __CONFIG_H
+#include <config.h>
+#endif
 #define INTERRUPT_GATE	0xe
 #define TRAP_GATE 	0xf
+
 typedef struct {
 	uint16_t length;
 	void * table;
@@ -22,13 +25,23 @@ typedef struct {
 	uint32_t eip;
  	uint32_t cs;
 	uint32_t eflags;
-	uint32_t useresp;
+	uint32_t esp;	/* when DPL=3 this is a different story, I think */
 	uint32_t ss;
-} __attribute__((packed)) regs; 
-/* CPU saved regs */
+} __attribute__((packed)) isr_savedregs;
+
+typedef struct {
+	uint32_t eip;
+	uint32_t cs;
+	uint32_t eflags;
+	uint32_t esp;
+	uint32_t ss;
+	uint32_t error_code;
+} __attribute__ ((packed)) exception_savedregs;	/**/
 
 extern void lidt(idt_entry * idt);		/* load IDTR register */
-extern void set_idt_entry(idt_entry * idt,uint8_t n,uint16_t selector, uint8_t dpl, uint8_t gate_type, void * off);
-extern __attribute__((interrupt)) void generic_interrupt_handler(regs * u);
+extern void set_idt_entry(idt_entry * idt,uint16_t selector, uint8_t dpl, uint8_t gate_type, void * off);
+extern __attribute__((interrupt)) void generic_interrupt_handler(isr_savedregs * u);
 extern void init_interrupts(idt_entry * idt);
+extern __attribute__((interrupt)) void kbd_interrupt_handler(isr_savedregs * u);
 
+extern idt_entry * const idt;
