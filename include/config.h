@@ -20,3 +20,8 @@
  * more than 3 control transfers in, that call can be written
  * in a much better way.
 */
+/* controls whether i8042 driver enables mouse ever.*/
+#define HAS_MOUSE 0
+
+#define PIC1_OFF 0x20
+#define PIC2_off 0x28
