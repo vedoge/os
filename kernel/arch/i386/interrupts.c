@@ -34,13 +34,23 @@ void set_idt_entry(idt_entry * idt, uint16_t selector, uint8_t dpl, uint8_t gate
 	idt->options_byte = (1<<7) | (dpl << 5) | gate_type;
 	return;
 }
+
 __attribute__((interrupt)) void generic_interrupt_handler(isr_savedregs * u)
 {
+	/* this works but is an annoyance at best. Replace with device 
+	 * driver ISR at the soonest
+	 */
 	/* __asm__ volatile ("hlt"); */
 	vga_puts("Interrupt\n",0x4f);
 	return;
 }
 void init_interrupts(idt_entry *  const idt) {
+	/* faulty pointer arithmetic was the culprit here - ptr+i increments ptr by i*sizeof(*ptr)
+	 * as opposed to just plain old i; using i*sizeof(ptr) as the index here was causing only
+	 * every eighth interrupt to be enabled, leading to triple faults upon calling ISR 0x33, 
+	 * for example. 
+	 * Silly mistake - shows just how rusty I am with C.
+	 */
 	for(int i = 0; i <= NR_INTERRUPTS; i++) {
 		set_idt_entry((idt+i),0x8, 0x0, INTERRUPT_GATE, &generic_interrupt_handler);
 	}
