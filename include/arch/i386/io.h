@@ -12,4 +12,5 @@
 			  "a" (val) 		/* val mapped to al (data being sent) */ \
 			:  		/* no clobber*/ \
 			)
-
+#define io_delay() \
+	asm volatile ("jmp 1f; 1: jmp 2f;2:"); /*jmp $+2 x3*/
