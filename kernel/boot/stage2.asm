@@ -173,8 +173,8 @@ start:
 	mov ss, eax
 	mov esp, 0xf000
 	mov ebp, esp
-	mov esi, message
-	call vgaprint
+;	mov esi, message
+;	call vgaprint
 	; PIC initialisation
 	; PIC masks are not saved as they will be masked and set up later
 	mov al, 0x11 		; ICW1_INIT | ICW1_ICW4
@@ -275,8 +275,8 @@ pg_enabled:
 
 	cli
 	; show something on screen (debugging purposes)
-	mov esi, paged
-	call vgaprint
+;	mov esi, paged
+;	call vgaprint
 ;	hlt			; NOTE DEBUGGING STOP
 
 ; check elf magic number
