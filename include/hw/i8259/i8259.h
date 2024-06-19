@@ -17,7 +17,7 @@
 #define ICW4_SFNM	0x10
 
 extern void eoi(uint8_t irq);
-extern void init_pic(void); /* to be implemented; unsure if still needed */
+extern void init_8259(void); /* to be implemented; unsure if still needed */
 extern void mask_all(void);
 extern void clear_mask(uint8_t irq);
 extern void set_mask(uint8_t irq);
