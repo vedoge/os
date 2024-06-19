@@ -17,7 +17,7 @@
 #define VGA_COLS	80
 #define VGA_ROWS	25
 #define VGA_ATTRIB(bg,fg) (uint8_t)fg | ((uint8_t)bg<<4)		/* pack both into one byte */
-extern void vga_putchar(uint8_t uc, uint8_t attrib, uint8_t x, uint8_t y); 
+extern void vga_putchar (uint8_t uc, uint8_t attrib);
 extern size_t vga_puts(const char * string, uint8_t attrib);	/* returns the number of characters printed */
 extern size_t strlen(const char * string);
 extern void update_cursor(uint16_t pos);		/* pos is the last */
