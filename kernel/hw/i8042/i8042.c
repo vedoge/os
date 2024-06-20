@@ -11,7 +11,9 @@
  * Even worse is that the multiple "iret"s that should be emitted 
  * by the compiler-assembler-linker are simply nowhere to be seen. 
  * The control flow slips and slides nicely through the print. 
- * Hell, the 
+ * I found the issue, I think - the 8042 issues 1 IRQ per byte sent.
+ * - Me, 18/06/2024, 23:38
+ * Use a damn flip-flop for the thing. The 8042 sends 1 interrupt per 
  */
 
 #include <hw/i8042/i8042.h>
@@ -140,12 +142,11 @@ step5:
 	clear_mask (1);
 	return;
 }
-
+/*
 __attribute__ ((interrupt)) void kbd_interrupt_handler(isr_savedregs * regs) {
-	/* The main event */
-	/* vga_puts("interrupt called", 0x4f); */
+	
+	 
 	uint8_t scancode1 = 0, scancode2 = 0; 
-	/* asm("hlt"); */
 	inb(DATA_8042, scancode1);
 	if(scancode1 == 0xF0) {
 		inb (0x60, scancode2);
@@ -171,6 +172,7 @@ __attribute__ ((interrupt)) void kbd_interrupt_handler(isr_savedregs * regs) {
 		return; 
 	}
 }
+*/
 __attribute__ ((noreturn)) void cold_reset(void) {
 	wait_until_8042_expects_write(); 
 	outb(COM_8042, SYSTEM_RESET);
