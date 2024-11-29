@@ -28,12 +28,19 @@ size_t strlen(const char * string) {
 size_t vga_puts(const char * string, uint8_t attrib) {
 	size_t i = 0;
 	for (; i < strlen(string); i++) {
-loop:		if (*(string+i) == '\n') {
-			index = ((index / VGA_COLS)+1)*VGA_COLS;
+loop:		switch (*(string+i)) {
+		case '\n':
+			index = ((index / VGA_COLS)+1)*VGA_COLS-2;
 			index = index >= (VGA_ROWS*VGA_COLS) ? 0 : index;		/* wrap around */ 
 			update_cursor(index);
-			i++;
+			++i;
+			goto loop;	/* repeat without printing or incrementing */
+			break;
+		case '\b':
+			index--;
+			++i;
 			goto loop;
+			
 		}
 		index = index >= (VGA_ROWS*VGA_COLS) ? 0 : index;		/* wrap around */ 
 		/* typecasting black magick incoming */

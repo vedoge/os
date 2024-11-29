@@ -26,41 +26,62 @@ verify		equ 0x16
 scan_le		equ 0x19
 scan_he		equ 0x1d
 */
-#define	read_track	0x2		/* read a track */
-#define	specify		0x3		/* */
-#define	sense_status	0x4
-#define	write_data	0x5
-#define	read_data	0x6
-#define	recalibrate	0x7
-#define	sense_interrupt	0x8
-#define	write_del_data	0x9
-#define	read_id		0xa
-#define	read_del_data	0xb
-#define	format_track	0xd
-#define	dumpreg		0xe
-#define	seek		0xf
-#define	version		0x10
-#define	scan_equal	0x11
-#define	perpendicular	0x12
-#define	configure	0x13
-#define	lock		0x14
-#define	verify		0x16
-#define	scan_le		0x19
-#define	scan_he		0x1d
+#define	READ_TRACK	0x2		/* read a track */
+#define	SPECIFY		0x3		/* specify config */
+#define	SENSE_STATUS	0x4
+#define	WRITE_DATA	0x5
+#define	READ_DATA	0x6
+#define	RECALIBRATE	0x7
+#define	SENSE_INT	0x8
+#define	WRITE_DEL_DATA	0x9
+#define	READ_ID		0xa
+#define	READ_DEL_DATA	0xb
+#define	FORMAT_TRACK	0xd
+#define	DUMPREG		0xe
+#define	SEEK		0xf
+#define	VERSION		0x10
+#define	SCAN_EQUAL	0x11
+#define	PERPENDICULAR	0x12
+#define	CONFIGURE	0x13
+#define	LOCK		0x94
+#define UNLOCK		0x14
+#define	VERIFY		0x16
+#define	SCAN_LE		0x19
+#define	SCAN_HE		0x1d
 
-#define ST_A		0x3F0 /* ro */
-#define	ST_B		0x3F1 /* ro */
-#define	DOR		0x3F2 /* rw */
-#define	TAPE		0x3F3 /* rw */
-#define	MSR		0x3F4 /* ro */
-#define	DSR		0x3F4 /* wo */
-#define	FIFO		0x3F5 /* rw */
-#define	DIR		0x3F7 /* ro */
-#define	CCR		0x3F7 /* wo */
+#define IBM_350_1440	0
 
+#define ST_A	0x3F0 /* ro */
+#define	ST_B	0x3F1 /* ro */
+#define	DOR	0x3F2 /* rw */
+#define	TAPE	0x3F3 /* rw */
+#define	MSR	0x3F4 /* ro */
+#define	DSR	0x3F4 /* wo */
+#define	FIFO	0x3F5 /* rw */
+#define	DIR	0x3F7 /* ro */
+#define	CCR	0x3F7 /* wo */
+/* add your floppy config here */
+uint32_t floppies [4] = {0,0,0,0}; 
+#define wait_for_irq6(flipflop) { \
+	int mangled_name = 10000; \
+	for(; mangled_name != 0; --mangled_name) { \
+		if (flipflop) break; \
+		else io_delay(); \
+	} \
+	flipflop = !(mangled_name); \
+	/* if the flipflop remains true after the IRQ then we timed out, else all is well */ \
+}
+uint16_t hpc [] = {2,0};
+uint16_t spt [] = {18,0};
+uint16_t gpl [] = {27,0};
+typedef struct {
+	uint8_t c; 
+	uint8_t h;
+	uint8_t s;
+} __attribute__ ((packed)) chs_t;
 extern void init_floppy (void);		/* initialise floppy controller */
 extern void reset_floppy(void);		/* reset upon failure */
 extern void *read_sectors(uint16_t lba, size_t count, size_t drive);
 extern void motor_on(void);
 extern void motor_off(void);
-extern __attribute__ ((interrupt)) void irq6_handler(struct regs * regs); 
+extern __attribute__ ((interrupt)) void flipflop_upon_irq (isr_savedregs * regs); 

@@ -7,6 +7,10 @@
 #endif
 #define INTERRUPT_GATE	0xe
 #define TRAP_GATE 	0xf
+#define cli() \
+	asm volatile ("cli")
+#define sti() \
+	asm volatile ("sti")
 
 typedef struct {
 	uint16_t length;
@@ -43,5 +47,4 @@ extern void set_idt_entry(idt_entry * idt,uint16_t selector, uint8_t dpl, uint8_
 extern __attribute__((interrupt)) void generic_interrupt_handler(isr_savedregs * u);
 extern void init_interrupts(idt_entry * idt);
 extern __attribute__((interrupt)) void kbd_interrupt_handler(isr_savedregs * u);
-
 extern idt_entry * const idt;

@@ -71,8 +71,6 @@ static inline void discard_8042_output(void) {
 	}
 }
 void init_8042(void) {
-	/* command is called before interrupts are enabled */
-	/* this command should NOT be called before that */
 	uint8_t res;
 
 	outb (COM_8042, DISABLE_KBD);
@@ -113,16 +111,15 @@ step3: 	outb (DATA_8042,KBD_SELF_TEST);
 	wait_until_8042_expects_read();
 	inb (DATA_8042, res); 
 	if (res != KBD_ACK) goto step3; 
-
 	wait_until_8042_expects_read(); 
 	inb (DATA_8042, res); 
-	if (res != 0xAA) asm volatile ("jmp .");
+	if (res != 0xAA) asm volatile ("jmp ."); /* passes */
 
-step4: 	outb (DATA_8042, KBD_SCANCODE);
+step4: 	outb (DATA_8042, KBD_SCANCODE); /* passes */
 	wait_until_8042_expects_write(); 
-	outb (DATA_8042, 0x2); 
+	outb (DATA_8042, 0x2); /* passes */
 	wait_until_8042_expects_read(); 
-	inb (DATA_8042, res); 
+	inb (DATA_8042, res); /* passes */
 	if (res != KBD_ACK) goto step4; 
 	
 	while(true) {

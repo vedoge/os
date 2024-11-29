@@ -278,7 +278,14 @@ pg_enabled:
 ;	mov esi, paged
 ;	call vgaprint
 ;	hlt			; NOTE DEBUGGING STOP
-
+; mark all pages in the first 4 mb as allocated (set least significant avl bit)
+	std
+	mov edi, 0x1000
+	mov ecx, 0x400
+.loop:
+	; actually use all options available in x86 addressing likeaboss
+	or dword [edi+ecx*4-4], 0x203
+	loop .loop
 ; check elf magic number
 	mov esi, 0x40000	; location of file we loaded in RealMode
 	push esi 		; save it for later
@@ -290,6 +297,7 @@ pg_enabled:
 	pop esi
 ;	hlt			; NOTE DEBUGGING STOP
 ; prepare to loop through the program header table
+;	hlt			; NOTE DEBUGGING STOP
 	movzx ecx, word [esi+e_phnum]
 	mov eax, [esi+e_phoff]	; store program header offset
 	lea esi, [esi+eax*1-p_size]
@@ -376,7 +384,9 @@ modify_page_table:
 	add ebx, 0x1000
 	mov eax, ebx		
 	or eax, 3		; present and writable
+	cld
 	stosd
+	std
 	loop modify_page_table.loop
 	;endloop
 	shr ebx, 12
