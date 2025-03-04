@@ -1,3 +1,4 @@
+#ifndef __INTERRUPTS_H
 #define __INTERRUPTS_H
 #ifndef __STDINT_H
 #include <stdint.h>
@@ -48,3 +49,4 @@ extern __attribute__((interrupt)) void generic_interrupt_handler(isr_savedregs *
 extern void init_interrupts(idt_entry * idt);
 extern __attribute__((interrupt)) void kbd_interrupt_handler(isr_savedregs * u);
 extern idt_entry * const idt;
+#endif

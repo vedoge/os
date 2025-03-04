@@ -1,3 +1,4 @@
+#ifndef __STDARG_H
 #define __STDARG_H
 typedef __BUILTIN_VA_LIST va_list
 #define va_start(list,start) \
@@ -9,4 +10,4 @@ typedef __BUILTIN_VA_LIST va_list
 #define va_end(list) \
 	__builtin_va_end(list)
 /* something like that */
-
+#endif

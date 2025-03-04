@@ -1,25 +1,13 @@
 /* temporarily contains routines intended to test different bits of the OS. */
-#ifndef __CONFIG_H
+/* I'll eventually have this initialise usermode and hand off to INIT.BIN and CMD.BIN */
 #include <config.h>
-#endif
-#ifndef __VGA_H
 #include <hw/vga/vga.h>
-#endif
-#ifndef __INTERRUPTS_H
 #include <arch/i386/interrupts.h>
-#endif
-#ifndef __GDT_H
 /* #include <arch/i386/gdt.h> */
-#endif
-#ifndef __I8259_H
 #include <hw/i8259/i8259.h>
-#endif
-#ifndef __I8042_H
 #include <hw/i8042/i8042.h>
-#endif
-#ifndef __IO_H
+#include <hw/i82077a/i82077a.h>
 #include <arch/i386/io.h>
-#endif
 
 /* 
  * Triple faults because the handler has a not-present selector...?
@@ -37,14 +25,13 @@ int main(void) {
 	char * hello = "hello, ELF World!\n";		/* test string */
 	vga_puts(hello,VGA_ATTRIB(VGA_BLINK | VGA_BLACK, VGA_BRIGHT | VGA_WHITE));
 	init_interrupts(idt);				/* fill with default handler */
-	
 	cli();
 	init_8259();					/* initialise the PIC */
 	lidt(idt);
 	init_8042();					/* initialise the keyboard controller */
 	sti();						/* enable interrupts */
 	init_82077a();					/* initialise the floppy controller */
-	void * sect = read_sectors(1,1,0);
+	read_sectors(0,1);
 	for(;;)
 		asm volatile ("hlt");				/* stop here and wait for interrupts */
 }

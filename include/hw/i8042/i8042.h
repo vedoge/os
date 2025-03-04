@@ -1,3 +1,4 @@
+#ifndef __I8042_H
 #define __I8042_H
 
 #ifndef __INTERRUPTS_H
@@ -39,3 +40,4 @@ static inline void discard_8042_input(void);
 extern void init_8042(void);
 extern __attribute__ ((interrupt)) void kbd_interrupt_handler(isr_savedregs * regs);
 extern __attribute__ ((noreturn)) void cold_reset(void); 	/*cold reboot*/
+#endif

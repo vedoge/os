@@ -1,3 +1,4 @@
+#ifndef __I8259_H
 #define __I8259_H
 #define PIC1_COM 0x20
 #define PIC1_DATA 0x21
@@ -21,4 +22,4 @@ extern void init_8259(void); /* to be implemented; unsure if still needed */
 extern void mask_all(void);
 extern void clear_mask(uint8_t irq);
 extern void set_mask(uint8_t irq);
-
+#endif

@@ -1,3 +1,4 @@
+#ifndef __CONFIG_H
 #define __CONFIG_H
 #define MAXMEM 16777216		// bytes of memory mapped 
 /*
@@ -25,3 +26,4 @@
 
 #define PIC1_OFF 0x20
 #define PIC2_off 0x28
+#endif

@@ -103,7 +103,7 @@ SETUPSTAGE:
 	; define the segmentation of the kernel. 
 	PUSH ES
 	POP DS
-	PUSH 0x400
+	PUSH 0xc00
 	POP ES
 	XOR BX, BX		; ensure buffer address pointer is set to 0 (kernel size limit of 640KiB) 
 
@@ -199,7 +199,7 @@ ENTER:
 ;	OR EAX, 1	;PE=1 (protection enable) 
 ;	MOV CR0, EAX
 ;	JMP 0x8:0x4000	; go! perform a long jump to the starting address with the CODESEG selected
-	JMP 0x0:0x4000	;go to memory address 0x4000
+	JMP 0x0:0xC000	;go to memory address 0xC000
 
 ; data area
 FLOPPYERROR:	DB "Floppy error!", 0

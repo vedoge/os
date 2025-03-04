@@ -1,3 +1,4 @@
+#ifndef __SCANCODES_H
 #define __SCANCODES_H
 /* const */ unsigned char ansi_scancodes [] = {
 	0,0,0,0,0,0,0,0,0,0,0,0,
@@ -131,3 +132,4 @@ PrtScr
 ScrollLock
 Pause
 */
+#endif

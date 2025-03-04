@@ -21,18 +21,18 @@ kbd_interrupt_handler:
 	movzbl %dl, %edx
 	inb %dx, %al
 	/* check if the byte received is part of a multibyte sequence */
-	cmp $0, (key_up_flip_flop)
+	cmpb $0, (key_up_flip_flop)
 	jne key_up
-	cmp $0, (extended_key_flip_flop)
+	cmpb $0, (extended_key_flip_flop)
 	jne extended_key
-	cmp $0, (pause_key_flip_flop)
+	cmpb $0, (pause_key_flip_flop)
 	jne pause_key
 	/* now check if the byte received begins a multibyte sequence */
-	cmp $0xf0, %al
+	cmpb $0xf0, %al
 	je set_key_up_flip_flop		/* if key-up code */ 
-	cmp $0xe0, %al
+	cmpb $0xe0, %al
 	je set_extended_key_flip_flop
-	cmp $0xe1, %al
+	cmpb $0xe1, %al
 	je set_pause_key_flip_flop
 	/* if we reached here, the byte is normal and needs translation */
 	movl $scancode_table, %ebx	/* translate the sequence */

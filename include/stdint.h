@@ -1,3 +1,4 @@
+#ifndef __STDINT_H
 #define __STDINT_H
 typedef signed char	int8_t;
 typedef signed short	int16_t;
@@ -11,4 +12,4 @@ typedef unsigned char	size_t;
 #ifndef NULL
 #define NULL ((void *) 0)
 #endif
-
+#endif

@@ -1,3 +1,4 @@
+#ifndef __I82077A_H
 #define __I82077A_H
 #include <stdint.h>
 #include <arch/i386/interrupts.h>
@@ -61,7 +62,6 @@ scan_he		equ 0x1d
 #define	DIR	0x3F7 /* ro */
 #define	CCR	0x3F7 /* wo */
 /* add your floppy config here */
-uint32_t floppies [4] = {0,0,0,0}; 
 #define wait_for_irq6(flipflop) { \
 	int mangled_name = 10000; \
 	for(; mangled_name != 0; --mangled_name) { \
@@ -71,9 +71,10 @@ uint32_t floppies [4] = {0,0,0,0};
 	flipflop = !(mangled_name); \
 	/* if the flipflop remains true after the IRQ then we timed out, else all is well */ \
 }
-uint16_t hpc [] = {2,0};
-uint16_t spt [] = {18,0};
-uint16_t gpl [] = {27,0};
+/* for the 3.5" 1.44MB diskette*/
+#define hpc 2 /* heads per cylinder */
+#define spt 18/* sectors per track */
+#define gpl 27/* gap length */
 typedef struct {
 	uint8_t c; 
 	uint8_t h;
@@ -81,7 +82,9 @@ typedef struct {
 } __attribute__ ((packed)) chs_t;
 extern void init_floppy (void);		/* initialise floppy controller */
 extern void reset_floppy(void);		/* reset upon failure */
-extern void *read_sectors(uint16_t lba, size_t count, size_t drive);
+extern void *read_sectors(uint16_t lba, size_t count);
 extern void motor_on(void);
 extern void motor_off(void);
 extern __attribute__ ((interrupt)) void flipflop_upon_irq (isr_savedregs * regs); 
+#endif
+

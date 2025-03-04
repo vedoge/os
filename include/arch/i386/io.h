@@ -1,4 +1,5 @@
-#define _IO_H
+#ifndef __IO_H
+#define __IO_H
 #define inb(port,val) /* receive input from the port "port" in "val" */ \
 	asm volatile (	"inb %%dx, %%al"  								\
 			: "=a" (val)		/* map al to var that stores it is the value being received */ \
@@ -14,3 +15,4 @@
 			)
 #define io_delay() \
 	asm volatile ("jmp 1f; 1: jmp 2f;2:"); /*jmp $+2 x3*/
+#endif
