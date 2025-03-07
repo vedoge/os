@@ -1,0 +1,67 @@
+\begin{thebibliography}{xx}
+
+\harvarditem{{Altium Limited}}{2009}{ps2_reference}
+{Altium Limited}  \harvardyearleft 2009\harvardyearright , `{PS2 - PS/2
+  Controller}'.
+\newline\harvardurl{https://valhalla.altium.com/Learning-Guides/PS2-PS2_Controller.pdf}
+
+\harvarditem{Brown}{2000}{rbil}
+Brown, R. e.~a.  \harvardyearleft 2000\harvardyearright , `{Ralf} {Brown's}
+  {Interrupt} {List}'.
+\newline\harvardurl{https://www.cs.cmu.edu/~ralf/files.html}
+
+\harvarditem{Cloutier}{2023}{x86_reference}
+Cloutier, F.  \harvardyearleft 2023\harvardyearright , `x86 and amd64
+  {Instruction} {Reference}'.
+\newline\harvardurl{https://www.felixcloutier.com/x86}
+
+\harvarditem{{Corporation}}{1988}{i8259_datasheet}
+{Corporation}, I.  \harvardyearleft 1988\harvardyearright , `Datasheet: {8259A}
+  {Programmable} {Interrupt} {Controller} ({8259A} {8259A-2})'.
+\newline\harvardurl{https://pdos.csail.mit.edu/6.828/2010/readings/hardware/8259A.pdf}
+
+\harvarditem{Corporation}{1994}{82077a_reference}
+Corporation, I.  \harvardyearleft 1994\harvardyearright , `82077aa datasheet'.
+\newline\harvardurl{https://www.alldatasheet.com/datasheet-pdf/pdf/167793/INTEL/82077AA.html}
+
+\harvarditem{{\em {Expanded Main Page - OSDev Wiki}}}{n.d.}{osdev-wiki}
+{\em {Expanded Main Page - OSDev Wiki}}  \harvardyearleft n.d.\harvardyearright
+  .
+\newline\harvardurl{https://wiki.osdev.org}
+
+\harvarditem{{Intel Corporation} \harvardand\ {Intel Corporation
+  Staff}}{1987}{i386_datasheet}
+{Intel Corporation} \harvardand\ {Intel Corporation Staff}  \harvardyearleft
+  1987\harvardyearright , {\em 386 Programmer's Reference Manual}, Intel
+  Corporation (CA).
+
+\harvarditem{{International Business Machines
+  Corporation}}{1981}{ibmpc_reference}
+{International Business Machines Corporation}  \harvardyearleft
+  1981\harvardyearright , `{International Business Machines Personal Computer
+  Technical Reference}'.
+
+\harvarditem[Saunders et~al.]{Saunders, Dehling, Seyler, Endler, Beck,
+  Takachuk, Horvat, van Tellingen, Gonta, Nemeth, Valongo, Sasano, Gorol,
+  Clingman, Nagel, Saiko \harvardand\ Dietl}{2023}{mikeos}
+Saunders, M., Dehling, E., Seyler, I., Endler, J., Beck, J., Takachuk, J.,
+  Horvat, M., van Tellingen, M., Gonta, M., Nemeth, P., Valongo, P., Sasano,
+  T., Gorol, T., Clingman, T., Nagel, W., Saiko, Y. \harvardand\ Dietl, P.
+  \harvardyearleft 2023\harvardyearright , `{MikeOS 4.5 - Simple and
+  educational Operating System written by Mike Saunders}'.
+\newline\harvardurl{https://www.github.com/mig-hub/mikeos}
+
+\harvarditem{StatCounter}{2023}{linux_adoption}
+StatCounter  \harvardyearleft 2023\harvardyearright , `{Operating System Market
+  Share Worldwide}'.
+\newline\harvardurl{https://gs.statcounter.com/os-market-share}
+
+\harvarditem{Torvalds}{1991}{linux}
+Torvalds, L.  \harvardyearleft 1991\harvardyearright , `Linux 0.01 source'.
+\newline\harvardurl{ftp://ftp.kernel.org/pub/linux/kernel/Historic/linux-0.01.tar.gz}
+
+\harvarditem{Watson \harvardand\ Williams}{2021}{igcse_textbook}
+Watson, D. \harvardand\ Williams, H.  \harvardyearleft 2021\harvardyearright ,
+  {\em {Cambridge IGCSE and O Level Computer Science}}, Hodder Education.
+
+\end{thebibliography}

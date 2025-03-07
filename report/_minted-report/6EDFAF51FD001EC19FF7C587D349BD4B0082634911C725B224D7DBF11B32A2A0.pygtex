@@ -1,0 +1,228 @@
+\begin{Verbatim}[commandchars=\\\{\}]
+\PYG{c+c1}{; Dear reader, }
+\PYG{c+c1}{; The fact that this is a resounding success is evident from the dearth of comments here. }
+\PYG{c+c1}{; However, much work is still to be done.}
+\PYG{c+c1}{; This bootloader must account for the fact that floppy reads on actual systems fail very, very often.}
+\PYG{c+c1}{; It is not unusual to find that 3\PYGZhy{}4 rereads are needed to get a sector right. }
+\PYG{c+c1}{; This bootloader is not ready to be run on a physical system. This comment may be removed later.}
+\PYG{c+c1}{; Until then, run this at your own risk. If you understand the code, read it, paying particular attention to disk I/O. }
+\PYG{c+c1}{; It is however worth noting that this code is perfectly safe to run on a virtual system.}
+\PYG{c+c1}{; Yours truly, }
+\PYG{c+c1}{; Vedant G, Singapore, 22:22 UTC+08 2023\PYGZhy{}11\PYGZhy{}23.}
+\PYG{k}{BITS}\PYG{+w}{ }\PYG{l+m+mi}{16}
+\PYG{k}{ORG}\PYG{+w}{ }\PYG{l+m+mh}{0x7C00}
+\PYG{n+nf}{JMP}\PYG{+w}{ }\PYG{n+nv}{BEGIN}\PYG{+w}{ }
+\PYG{n+nf}{NOP}
+\PYG{n+nl}{BPB:}
+\PYG{c+c1}{; written with help from the good folks at OSDev and Wikipedia (thanks btw) and random documentation I found online}
+\PYG{c+c1}{; Mountable on Linux; maybe not so on MS\PYGZhy{}DOS (Windows)}
+\PYG{n+nl}{OEMLBL:}\PYG{+w}{ }\PYG{k+kd}{DB}\PYG{+w}{ }\PYG{l+s}{\PYGZdq{}VOSFLP  \PYGZdq{}}
+\PYG{n+nl}{BYTESPERSECTOR:}\PYG{+w}{ }\PYG{k+kd}{DW}\PYG{+w}{ }\PYG{l+m+mi}{512}
+\PYG{n+nl}{SECTORSPERCLUSTER:}\PYG{+w}{ }\PYG{k+kd}{DB}\PYG{+w}{ }\PYG{l+m+mi}{1}
+\PYG{n+nl}{RESERVEDSECTORS:}\PYG{+w}{ }\PYG{k+kd}{DW}\PYG{+w}{ }\PYG{l+m+mi}{1}\PYG{+w}{		}\PYG{c+c1}{; that\PYGZsq{}s us! }
+\PYG{n+nl}{NUMBEROFFATS:}\PYG{+w}{ }\PYG{k+kd}{DB}\PYG{+w}{ }\PYG{l+m+mi}{2}\PYG{+w}{		}\PYG{c+c1}{; as is standard on all FAT12 systems}
+\PYG{n+nl}{ROOTDIRENTRIES:}\PYG{+w}{ }\PYG{k+kd}{DW}\PYG{+w}{ }\PYG{l+m+mi}{224}\PYG{+w}{		}\PYG{c+c1}{; total theoretical root dir entries.}
+\PYG{n+nl}{SECTORS:}\PYG{+w}{ }\PYG{k+kd}{DW}\PYG{+w}{ }\PYG{l+m+mi}{2880}\PYG{+w}{		}\PYG{c+c1}{; Total sectors}
+\PYG{n+nl}{MEDIADESCRIPTOR:}\PYG{+w}{ }\PYG{k+kd}{DB}\PYG{+w}{ }\PYG{l+m+mh}{0xF0}\PYG{+w}{	}\PYG{c+c1}{; am floppy}
+\PYG{n+nl}{SECTORSPERFAT:}\PYG{+w}{ }\PYG{k+kd}{DW}\PYG{+w}{ }\PYG{l+m+mi}{9}
+\PYG{c+c1}{; end DOS 2.0 BPB}
+\PYG{c+c1}{; begin DOS 3.31 BPB }
+\PYG{n+nl}{SECTORSPERTRACK:}\PYG{+w}{ }\PYG{k+kd}{DW}\PYG{+w}{ }\PYG{l+m+mi}{18}
+\PYG{n+nl}{HEADS:}\PYG{+w}{ }\PYG{k+kd}{DW}\PYG{+w}{ }\PYG{l+m+mi}{2}
+\PYG{n+nl}{HIDDENSECTORS:}\PYG{+w}{ }\PYG{k+kd}{DD}\PYG{+w}{ }\PYG{l+m+mi}{0}
+\PYG{n+nl}{LARGESECTORS:}\PYG{+w}{ }\PYG{k+kd}{DD}\PYG{+w}{ }\PYG{l+m+mi}{0}
+\PYG{n+nl}{DRIVENO:}\PYG{+w}{ }\PYG{k+kd}{DB}\PYG{+w}{ }\PYG{l+m+mi}{0}\PYG{+w}{			}\PYG{c+c1}{; am floppy!!}
+\PYG{n+nl}{EXTBOOTSIGNATURE:}\PYG{+w}{ }\PYG{k+kd}{DB}\PYG{+w}{ }\PYG{l+m+mh}{0x29}\PYG{+w}{	}\PYG{c+c1}{; AM FLOPPY!!1!!!1!}
+\PYG{n+nl}{SERIAL:}\PYG{+w}{ }\PYG{k+kd}{DD}\PYG{+w}{ }\PYG{l+m+mh}{0xACDC}\PYG{+w}{		}\PYG{c+c1}{; yes}
+\PYG{n+nl}{LABEL:}\PYG{+w}{ }\PYG{k+kd}{DB}\PYG{+w}{ }\PYG{l+s}{\PYGZdq{}VOSFLOPPY  \PYGZdq{}}\PYG{+w}{		}\PYG{c+c1}{; volume label ALWAYS 11 CHARS}
+\PYG{n+nl}{FILESYSTEM:}\PYG{+w}{ }\PYG{k+kd}{DB}\PYG{+w}{ }\PYG{l+s}{\PYGZdq{}FAT12   \PYGZdq{}}
+\PYG{n+nl}{BEGIN:}
+\PYG{+w}{	}\PYG{n+nf}{CLI}\PYG{+w}{			}\PYG{c+c1}{; if an interrupt catches us while our stack is messed up we\PYGZsq{}re toast}
+\PYG{+w}{	}\PYG{n+nf}{MOV}\PYG{+w}{ }\PYG{n+nb}{AX}\PYG{p}{,}\PYG{+w}{ }\PYG{n+nb}{CS}
+\PYG{+w}{	}\PYG{n+nf}{MOV}\PYG{+w}{ }\PYG{n+nb}{SS}\PYG{p}{,}\PYG{+w}{ }\PYG{n+nb}{AX}
+\PYG{+w}{	}\PYG{n+nf}{MOV}\PYG{+w}{ }\PYG{n+nb}{AX}\PYG{p}{,}\PYG{+w}{ }\PYG{l+m+mh}{0x7000}\PYG{+w}{		}\PYG{c+c1}{; stack grows directly below us}
+\PYG{+w}{	}\PYG{n+nf}{MOV}\PYG{+w}{ }\PYG{n+nb}{SP}\PYG{p}{,}\PYG{+w}{ }\PYG{n+nb}{AX}
+\PYG{+w}{	}\PYG{n+nf}{STI}\PYG{+w}{			}\PYG{c+c1}{; 0xC00 bytes = 12 * 256 = 3096 bytes of stack should be plenty}
+
+\PYG{+w}{	}\PYG{c+c1}{; reset the floppy system}
+\PYG{+w}{	}\PYG{n+nf}{XOR}\PYG{+w}{ }\PYG{n+nb}{AH}\PYG{p}{,}\PYG{+w}{ }\PYG{n+nb}{AH}\PYG{+w}{		}\PYG{c+c1}{; reset}
+\PYG{+w}{	}\PYG{n+nf}{XOR}\PYG{+w}{ }\PYG{n+nb}{DL}\PYG{p}{,}\PYG{+w}{ }\PYG{n+nb}{DL}\PYG{+w}{		}\PYG{c+c1}{; drive 0}
+
+\PYG{+w}{	}\PYG{n+nf}{INT}\PYG{+w}{ }\PYG{l+m+mh}{0x13}
+
+\PYG{+w}{	}\PYG{n+nf}{PUSH}\PYG{+w}{ }\PYG{l+m+mh}{0x7E0}
+\PYG{+w}{	}\PYG{n+nf}{POP}\PYG{+w}{ }\PYG{n+nb}{ES}
+\PYG{+w}{	}\PYG{n+nf}{XOR}\PYG{+w}{ }\PYG{n+nb}{BX}\PYG{p}{,}\PYG{+w}{ }\PYG{n+nb}{BX}\PYG{+w}{		}\PYG{c+c1}{; ES:BX = 07E0:0000 (0x7E00), first free block of memory}
+
+\PYG{+w}{	}\PYG{n+nf}{MOV}\PYG{+w}{ }\PYG{n+nb}{AX}\PYG{p}{,}\PYG{+w}{ }\PYG{l+m+mh}{0x13}\PYG{+w}{		}\PYG{c+c1}{; sector 19}
+\PYG{+w}{	}\PYG{n+nf}{CALL}\PYG{+w}{ }\PYG{n+nv}{LBACHS}
+\PYG{+w}{	}\PYG{n+nf}{MOV}\PYG{+w}{ }\PYG{n+nb}{AH}\PYG{p}{,}\PYG{+w}{ }\PYG{l+m+mh}{0x02}\PYG{+w}{		}\PYG{c+c1}{; read sectors}
+\PYG{+w}{	}\PYG{n+nf}{MOV}\PYG{+w}{ }\PYG{n+nb}{AL}\PYG{p}{,}\PYG{+w}{ }\PYG{l+m+mi}{14}\PYG{+w}{		}\PYG{c+c1}{; 14 sectors}
+\PYG{+w}{	}\PYG{n+nf}{INT}\PYG{+w}{ }\PYG{l+m+mh}{0x13}
+\PYG{+w}{	}\PYG{n+nf}{JNC}\PYG{+w}{ }\PYG{n+nv}{READROOTDIR}\PYG{+w}{		}\PYG{c+c1}{; if no error, proceed. }
+
+\PYG{+w}{	}\PYG{n+nf}{MOV}\PYG{+w}{ }\PYG{n+nb}{AX}\PYG{p}{,}\PYG{+w}{ }\PYG{n+nb}{CS}
+\PYG{+w}{	}\PYG{n+nf}{MOV}\PYG{+w}{ }\PYG{n+nb}{DS}\PYG{p}{,}\PYG{+w}{ }\PYG{n+nb}{AX}
+\PYG{+w}{	}\PYG{n+nf}{MOV}\PYG{+w}{ }\PYG{n+nb}{SI}\PYG{p}{,}\PYG{+w}{ }\PYG{n+nv}{FLOPPYERROR}\PYG{+w}{	}\PYG{c+c1}{; floppy error string}
+\PYG{+w}{	}\PYG{n+nf}{CALL}\PYG{+w}{ }\PYG{n+nv}{BPRINT}\PYG{+w}{		}\PYG{c+c1}{; print it}
+\PYG{+w}{	}\PYG{n+nf}{CLI}\PYG{+w}{			}\PYG{c+c1}{; halt and catch fire}
+\PYG{+w}{	}\PYG{n+nf}{HLT}
+
+
+\PYG{n+nl}{READROOTDIR:}
+\PYG{+w}{	}\PYG{n+nf}{PUSH}\PYG{+w}{ }\PYG{n+nb}{CS}
+\PYG{+w}{	}\PYG{n+nf}{POP}\PYG{+w}{ }\PYG{n+nb}{DS}\PYG{+w}{			}\PYG{c+c1}{; ensure CS=DS (for proper addressing of the kernel filename at DS:SI)}
+\PYG{+w}{	}\PYG{n+nf}{XOR}\PYG{+w}{ }\PYG{n+nb}{DI}\PYG{p}{,}\PYG{+w}{ }\PYG{n+nb}{DI}
+\PYG{+w}{	}\PYG{n+nf}{MOV}\PYG{+w}{ }\PYG{n+nb}{CX}\PYG{p}{,}\PYG{+w}{ }\PYG{p}{[}\PYG{n+nv}{ROOTDIRENTRIES}\PYG{p}{]}\PYG{c+c1}{; loop through all the root entries available (224 in this case) }
+\PYG{+w}{	}\PYG{n+nf}{XOR}\PYG{+w}{ }\PYG{n+nb}{AX}\PYG{p}{,}\PYG{+w}{ }\PYG{n+nb}{AX}\PYG{+w}{		}\PYG{c+c1}{; AX is our offset}
+
+\PYG{n+nl}{SEARCHSTAGE:}
+\PYG{+w}{	}\PYG{n+nf}{PUSH}\PYG{+w}{ }\PYG{n+nb}{AX}\PYG{+w}{			}\PYG{c+c1}{; store offset at beginning of code}
+\PYG{+w}{	}\PYG{n+nf}{MOV}\PYG{+w}{ }\PYG{n+nb}{SI}\PYG{p}{,}\PYG{+w}{ }\PYG{n+nv}{STAGEFNAME}\PYG{+w}{	}\PYG{c+c1}{; DS:SI contains reference string, ES:DI points to root dir.}
+\PYG{+w}{	}\PYG{n+nf}{MOV}\PYG{+w}{ }\PYG{n+nb}{DX}\PYG{p}{,}\PYG{+w}{ }\PYG{l+m+mi}{11}
+\PYG{+w}{	}\PYG{n+nf}{XCHG}\PYG{+w}{ }\PYG{n+nb}{CX}\PYG{p}{,}\PYG{+w}{ }\PYG{n+nb}{DX}\PYG{+w}{		}\PYG{c+c1}{; exchange loop indices (entry is stored safely in DX, while CX is used by REP)}
+\PYG{n+nf}{REP}\PYG{+w}{	}\PYG{n+nv}{CMPSB}\PYG{+w}{			}\PYG{c+c1}{; compare the CX characters at DS:SI and ES:DI}
+\PYG{+w}{	}\PYG{n+nf}{JE}\PYG{+w}{ }\PYG{n+nv}{LOADFAT}\PYG{+w}{		}\PYG{c+c1}{; exit the loop if equal (we have a match safely in ES:DI)}
+
+\PYG{+w}{	}\PYG{n+nf}{POP}\PYG{+w}{ }\PYG{n+nb}{AX}\PYG{+w}{			}\PYG{c+c1}{; if not, prepare to offset the index.}
+\PYG{+w}{	}\PYG{n+nf}{ADD}\PYG{+w}{ }\PYG{n+nb}{AX}\PYG{p}{,}\PYG{+w}{ }\PYG{l+m+mi}{32}
+\PYG{+w}{	}\PYG{n+nf}{MOV}\PYG{+w}{ }\PYG{n+nb}{DI}\PYG{p}{,}\PYG{+w}{ }\PYG{n+nb}{AX}\PYG{+w}{		}\PYG{c+c1}{; next entry}
+\PYG{+w}{	}\PYG{n+nf}{XCHG}\PYG{+w}{ }\PYG{n+nb}{CX}\PYG{p}{,}\PYG{+w}{ }\PYG{n+nb}{DX}\PYG{+w}{		}\PYG{c+c1}{; external index (looping through the root directory entries themselves)}
+\PYG{n+nf}{LOOP}\PYG{+w}{	}\PYG{n+nv}{SEARCHSTAGE}
+\PYG{n+nl}{LOADFAT:}
+\PYG{+w}{	}\PYG{n+nf}{MOV}\PYG{+w}{ }\PYG{n+nb}{AX}\PYG{p}{,}\PYG{+w}{ }\PYG{p}{[}\PYG{n+nb}{ES}\PYG{p}{:}\PYG{n+nb}{DI}\PYG{o}{+}\PYG{l+m+mh}{0xF}\PYG{p}{]}\PYG{+w}{	}\PYG{c+c1}{; 11 (file length) + 15 (random info) = 26 (cluster offset)}
+\PYG{+w}{	}\PYG{n+nf}{PUSH}\PYG{+w}{ }\PYG{n+nb}{AX}
+\PYG{+w}{	}\PYG{n+nf}{MOV}\PYG{+w}{ }\PYG{n+nb}{AX}\PYG{p}{,}\PYG{+w}{ }\PYG{l+m+mi}{1}
+\PYG{+w}{	}\PYG{n+nf}{CALL}\PYG{+w}{ }\PYG{n+nv}{LBACHS}
+\PYG{+w}{	}\PYG{n+nf}{MOV}\PYG{+w}{ }\PYG{n+nb}{AH}\PYG{p}{,}\PYG{+w}{ }\PYG{l+m+mi}{2}\PYG{+w}{		}\PYG{c+c1}{; read sectors from drive}
+\PYG{+w}{	}\PYG{n+nf}{MOV}\PYG{+w}{ }\PYG{n+nb}{AL}\PYG{p}{,}\PYG{+w}{ }\PYG{l+m+mi}{9}\PYG{+w}{		}\PYG{c+c1}{; 9 sectors per FAT}
+\PYG{+w}{	}\PYG{n+nf}{PUSH}\PYG{+w}{ }\PYG{l+m+mh}{0x09A0}\PYG{+w}{		}\PYG{c+c1}{; 0x7E00 (first available offset) + 0x1C00 (length of root dir) gives 0x9A00 as FAT address}
+\PYG{+w}{	}\PYG{n+nf}{POP}\PYG{+w}{ }\PYG{n+nb}{ES}\PYG{+w}{			}\PYG{c+c1}{; load the FAT into memory at 0x9A00}
+\PYG{+w}{	}\PYG{n+nf}{XOR}\PYG{+w}{ }\PYG{n+nb}{BX}\PYG{p}{,}\PYG{+w}{ }\PYG{n+nb}{BX}\PYG{+w}{		}\PYG{c+c1}{; buffer address pointer now goes to the right place}
+\PYG{+w}{	}\PYG{n+nf}{INT}\PYG{+w}{ }\PYG{l+m+mh}{0x13}
+\PYG{n+nl}{SETUPSTAGE:}
+\PYG{+w}{	}\PYG{c+c1}{; define the segmentation of the kernel. }
+\PYG{+w}{	}\PYG{n+nf}{PUSH}\PYG{+w}{ }\PYG{n+nb}{ES}
+\PYG{+w}{	}\PYG{n+nf}{POP}\PYG{+w}{ }\PYG{n+nb}{DS}
+\PYG{+w}{	}\PYG{n+nf}{PUSH}\PYG{+w}{ }\PYG{l+m+mh}{0x400}
+\PYG{+w}{	}\PYG{n+nf}{POP}\PYG{+w}{ }\PYG{n+nb}{ES}
+\PYG{+w}{	}\PYG{n+nf}{XOR}\PYG{+w}{ }\PYG{n+nb}{BX}\PYG{p}{,}\PYG{+w}{ }\PYG{n+nb}{BX}\PYG{+w}{		}\PYG{c+c1}{; ensure buffer address pointer is set to 0 (kernel size limit of 640KiB) }
+
+\PYG{n+nl}{LOADSTAGE:}
+\PYG{+w}{	}\PYG{n+nf}{POP}\PYG{+w}{ }\PYG{n+nb}{AX}
+\PYG{+w}{	}\PYG{n+nf}{PUSH}\PYG{+w}{ }\PYG{n+nb}{AX}
+
+\PYG{+w}{	}\PYG{n+nf}{ADD}\PYG{+w}{ }\PYG{n+nb}{AX}\PYG{p}{,}\PYG{+w}{ }\PYG{l+m+mi}{31}\PYG{+w}{		}\PYG{c+c1}{; offset to cope with the way LBACHS calculates (LBA 34 = first data sector)}
+\PYG{+w}{	}\PYG{n+nf}{CALL}\PYG{+w}{ }\PYG{n+nv}{LBACHS}\PYG{+w}{		}\PYG{c+c1}{; put things in the right places}
+
+\PYG{+w}{	}\PYG{n+nf}{MOV}\PYG{+w}{ }\PYG{n+nb}{AH}\PYG{p}{,}\PYG{+w}{ }\PYG{l+m+mh}{0x02}
+\PYG{+w}{	}\PYG{n+nf}{MOV}\PYG{+w}{ }\PYG{n+nb}{AL}\PYG{p}{,}\PYG{+w}{ }\PYG{l+m+mh}{0x01}
+\PYG{+w}{	}\PYG{n+nf}{INT}\PYG{+w}{ }\PYG{l+m+mh}{0x13}
+
+\PYG{+w}{	}\PYG{n+nf}{ADD}\PYG{+w}{ }\PYG{n+nb}{BX}\PYG{p}{,}\PYG{+w}{ }\PYG{l+m+mh}{0x200}\PYG{+w}{		}\PYG{c+c1}{; bump buffer address pointer by 512 bytes}
+
+\PYG{+w}{	}\PYG{n+nf}{POP}\PYG{+w}{ }\PYG{n+nb}{AX}
+
+\PYG{+w}{	}\PYG{n+nf}{PUSH}\PYG{+w}{ }\PYG{n+nb}{BX}
+\PYG{+w}{	}\PYG{n+nf}{XOR}\PYG{+w}{ }\PYG{n+nb}{DX}\PYG{p}{,}\PYG{+w}{ }\PYG{n+nb}{DX}\PYG{+w}{		}\PYG{c+c1}{; zero upper byte}
+\PYG{+w}{	}\PYG{n+nf}{MOV}\PYG{+w}{ }\PYG{n+nb}{BX}\PYG{p}{,}\PYG{+w}{ }\PYG{l+m+mi}{3}
+\PYG{+w}{	}\PYG{n+nf}{MUL}\PYG{+w}{ }\PYG{n+nb}{BX}
+\PYG{+w}{	}\PYG{n+nf}{MOV}\PYG{+w}{ }\PYG{n+nb}{BX}\PYG{p}{,}\PYG{+w}{ }\PYG{l+m+mi}{2}
+\PYG{+w}{	}\PYG{n+nf}{DIV}\PYG{+w}{ }\PYG{n+nb}{BX}
+\PYG{+w}{	}\PYG{n+nf}{POP}\PYG{+w}{ }\PYG{n+nb}{BX}
+
+\PYG{+w}{	}\PYG{n+nf}{MOV}\PYG{+w}{ }\PYG{n+nb}{SI}\PYG{p}{,}\PYG{+w}{ }\PYG{n+nb}{AX}
+\PYG{+w}{	}\PYG{n+nf}{MOV}\PYG{+w}{ }\PYG{n+nb}{AX}\PYG{p}{,}\PYG{+w}{ }\PYG{p}{[}\PYG{n+nb}{DS}\PYG{p}{:}\PYG{n+nb}{SI}\PYG{p}{]}\PYG{+w}{		}\PYG{c+c1}{; for copying and comparing}
+\PYG{+w}{	}\PYG{n+nf}{OR}\PYG{+w}{ }\PYG{n+nb}{DX}\PYG{p}{,}\PYG{+w}{ }\PYG{l+m+mi}{0}
+\PYG{+w}{	}\PYG{n+nf}{JZ}\PYG{+w}{ }\PYG{n+nv}{EVEN}
+\PYG{n+nl}{ODD:}
+\PYG{+w}{	}\PYG{n+nf}{SHR}\PYG{+w}{ }\PYG{n+nb}{AX}\PYG{p}{,}\PYG{+w}{ }\PYG{l+m+mi}{4}\PYG{+w}{		}\PYG{c+c1}{; low nibble is part of another entry}
+\PYG{+w}{	}\PYG{c+c1}{; fallthrough, but it makes no difference anyways. }
+\PYG{n+nl}{EVEN:}
+\PYG{+w}{	}\PYG{n+nf}{AND}\PYG{+w}{ }\PYG{n+nb}{AX}\PYG{p}{,}\PYG{+w}{ }\PYG{l+m+mh}{0x0FFF}\PYG{+w}{		}\PYG{c+c1}{; high nibble is part of another entry}
+\PYG{+w}{	}\PYG{n+nf}{CMP}\PYG{+w}{ }\PYG{n+nb}{AX}\PYG{p}{,}\PYG{+w}{ }\PYG{l+m+mh}{0x0FF0}
+\PYG{+w}{	}\PYG{n+nf}{JGE}\PYG{+w}{ }\PYG{n+nv}{ENTER}
+\PYG{+w}{	}\PYG{n+nf}{PUSH}\PYG{+w}{ }\PYG{n+nb}{AX}\PYG{+w}{			}\PYG{c+c1}{; save cluster for next iteration}
+\PYG{+w}{	}\PYG{n+nf}{JMP}\PYG{+w}{ }\PYG{n+nv}{LOADSTAGE}\PYG{+w}{ }
+\PYG{n+nl}{LBACHS:}\PYG{+w}{	}
+\PYG{+w}{	}\PYG{c+c1}{; function is specific to 3.5\PYGZdq{} diskette format and must be modified to fit larger and more general disks. }
+\PYG{+w}{	}\PYG{c+c1}{; puts CHS parameters in the right place for INT 0x13 to use}
+\PYG{+w}{	}\PYG{n+nf}{PUSH}\PYG{+w}{ }\PYG{n+nb}{BX}\PYG{+w}{		}\PYG{c+c1}{; put away BX as a garbage register}
+\PYG{+w}{	}\PYG{c+c1}{; there seems to be a problem here}
+\PYG{+w}{	}\PYG{n+nf}{XOR}\PYG{+w}{ }\PYG{n+nb}{DX}\PYG{p}{,}\PYG{+w}{ }\PYG{n+nb}{DX}\PYG{+w}{	}\PYG{c+c1}{; ensure high word is not set else 32\PYGZhy{}bit division}
+\PYG{+w}{	}\PYG{n+nf}{MOV}\PYG{+w}{ }\PYG{n+nb}{BX}\PYG{p}{,}\PYG{+w}{ }\PYG{l+m+mi}{18}\PYG{+w}{	}\PYG{c+c1}{; sectors per track \PYGZhy{} some memory clashes happen here that need to be sorted out!}
+\PYG{+w}{			}\PYG{c+c1}{; methinks the BIOS parameter block is overwritten by the stack. }
+\PYG{+w}{	}\PYG{n+nf}{DIV}\PYG{+w}{ }\PYG{n+nb}{BX}\PYG{+w}{		}\PYG{c+c1}{; remainder ranges between 0 and 17 (DX = sector \PYGZhy{} 1)}
+\PYG{+w}{	}\PYG{n+nf}{INC}\PYG{+w}{ }\PYG{n+nb}{DX}\PYG{+w}{		}\PYG{c+c1}{; add 1 to make it 1\PYGZhy{}18 for proper addressing}
+\PYG{+w}{	}\PYG{n+nf}{MOV}\PYG{+w}{ }\PYG{n+nb}{CL}\PYG{p}{,}\PYG{+w}{ }\PYG{n+nb}{DL}\PYG{+w}{	}\PYG{c+c1}{; put in place}
+\PYG{+w}{	}\PYG{n+nf}{XOR}\PYG{+w}{ }\PYG{n+nb}{DX}\PYG{p}{,}\PYG{+w}{ }\PYG{n+nb}{DX}\PYG{+w}{	}\PYG{c+c1}{; ensure high word is not set, else 32\PYGZhy{}bit division}
+\PYG{+w}{	}\PYG{n+nf}{MOV}\PYG{+w}{ }\PYG{n+nb}{BX}\PYG{p}{,}\PYG{+w}{ }\PYG{l+m+mi}{2}\PYG{+w}{	}\PYG{c+c1}{; calculate head and cylidner}
+\PYG{+w}{	}\PYG{n+nf}{DIV}\PYG{+w}{ }\PYG{n+nb}{BX}\PYG{+w}{		}\PYG{c+c1}{; double\PYGZhy{}sided hence the divide}
+\PYG{+w}{	}\PYG{n+nf}{MOV}\PYG{+w}{ }\PYG{n+nb}{DH}\PYG{p}{,}\PYG{+w}{ }\PYG{n+nb}{DL}\PYG{+w}{	}\PYG{c+c1}{; remainder is the head (where we are supposed to be), 0 or 1}
+\PYG{+w}{	}\PYG{n+nf}{MOV}\PYG{+w}{ }\PYG{n+nb}{CH}\PYG{p}{,}\PYG{+w}{ }\PYG{n+nb}{AL}\PYG{+w}{	}\PYG{c+c1}{; quotient is our cylinder (how far out we are supposed to be)}
+\PYG{+w}{	}\PYG{n+nf}{XOR}\PYG{+w}{ }\PYG{n+nb}{DL}\PYG{p}{,}\PYG{+w}{ }\PYG{n+nb}{DL}\PYG{+w}{	}\PYG{c+c1}{; zero real quick}
+\PYG{+w}{	}\PYG{n+nf}{POP}\PYG{+w}{ }\PYG{n+nb}{BX}\PYG{+w}{		}\PYG{c+c1}{; restore old BX}
+\PYG{+w}{	}\PYG{n+nf}{RET}\PYG{+w}{		}\PYG{c+c1}{; bye}
+
+\PYG{n+nl}{BPRINT:}
+\PYG{+w}{	}\PYG{n+nf}{PUSH}\PYG{+w}{ }\PYG{n+nb}{AX}\PYG{+w}{		}\PYG{c+c1}{; bprint clobbers AX}
+\PYG{n+nl}{.BPRINTLOOP:}
+\PYG{+w}{	}\PYG{n+nf}{MOV}\PYG{+w}{ }\PYG{n+nb}{AH}\PYG{p}{,}\PYG{+w}{ }\PYG{l+m+mh}{0x0E}\PYG{+w}{	}\PYG{c+c1}{; AH=0x0E, print to screen}
+\PYG{+w}{	}\PYG{n+nf}{LODSB}\PYG{+w}{		}\PYG{c+c1}{; MOV AL, [DS:SI]; INC SI}
+\PYG{+w}{	}\PYG{n+nf}{CMP}\PYG{+w}{ }\PYG{n+nb}{AL}\PYG{p}{,}\PYG{+w}{ }\PYG{l+m+mi}{0}\PYG{+w}{	}\PYG{c+c1}{; assuming null\PYGZhy{}terminated string}
+\PYG{+w}{	}\PYG{n+nf}{JE}\PYG{+w}{ }\PYG{n+nv}{.BPRINTDONE}\PYG{+w}{	}\PYG{c+c1}{; if it is, end}
+\PYG{+w}{	}\PYG{n+nf}{INT}\PYG{+w}{ }\PYG{l+m+mh}{0x10}\PYG{+w}{	}\PYG{c+c1}{; write to screen}
+\PYG{+w}{	}\PYG{n+nf}{JMP}\PYG{+w}{ }\PYG{n+nv}{.BPRINTLOOP}\PYG{+w}{	}\PYG{c+c1}{; loop for next character}
+\PYG{n+nl}{.BPRINTDONE:}
+\PYG{+w}{	}\PYG{n+nf}{POP}\PYG{+w}{ }\PYG{n+nb}{AX}
+\PYG{+w}{	}\PYG{n+nf}{RET}\PYG{+w}{		}\PYG{c+c1}{; quick end}
+\PYG{n+nl}{ENTER:}\PYG{+w}{ }
+\PYG{+w}{	}\PYG{n+nf}{CLI}
+\PYG{+w}{	}\PYG{c+c1}{; enable A20 line before protected mode switching}
+\PYG{+w}{	}\PYG{c+c1}{; this method interfaces with the PS/2 controller in the computer to do things to magically turn on the A20. }
+\PYG{+w}{	}\PYG{c+c1}{; idk how it works tho}
+\PYG{+w}{	}\PYG{n+nf}{CALL}\PYG{+w}{ }\PYG{n+nv}{PS2COMAWAIT}
+\PYG{+w}{	}\PYG{n+nf}{MOV}\PYG{+w}{ }\PYG{n+nb}{AL}\PYG{p}{,}\PYG{+w}{ }\PYG{l+m+mh}{0xD0}\PYG{+w}{	}\PYG{c+c1}{; read from status buffer}
+\PYG{+w}{	}\PYG{n+nf}{OUT}\PYG{+w}{ }\PYG{l+m+mh}{0x64}\PYG{p}{,}\PYG{+w}{ }\PYG{n+nb}{AL}\PYG{+w}{	}\PYG{c+c1}{; send command}
+\PYG{+w}{	}\PYG{n+nf}{IN}\PYG{+w}{ }\PYG{n+nb}{AL}\PYG{p}{,}\PYG{+w}{ }\PYG{l+m+mh}{0x60}\PYG{+w}{	}\PYG{c+c1}{; read}
+\PYG{+w}{	}\PYG{n+nf}{CALL}\PYG{+w}{ }\PYG{n+nv}{PS2DATAAWAIT}
+\PYG{+w}{	}\PYG{n+nf}{OR}\PYG{+w}{ }\PYG{n+nb}{AL}\PYG{p}{,}\PYG{+w}{ }\PYG{l+m+mh}{0x02}\PYG{+w}{	}\PYG{c+c1}{; A20 line enable}
+\PYG{+w}{	}\PYG{n+nf}{SHL}\PYG{+w}{ }\PYG{n+nb}{AX}\PYG{p}{,}\PYG{+w}{ }\PYG{l+m+mi}{8}\PYG{+w}{	}\PYG{c+c1}{; result in AH}
+\PYG{+w}{	}\PYG{n+nf}{CALL}\PYG{+w}{ }\PYG{n+nv}{PS2COMAWAIT}\PYG{c+c1}{; wait}
+\PYG{+w}{	}\PYG{n+nf}{MOV}\PYG{+w}{ }\PYG{n+nb}{AL}\PYG{p}{,}\PYG{+w}{ }\PYG{l+m+mh}{0xD1}\PYG{+w}{	}\PYG{c+c1}{; write output register}
+\PYG{+w}{	}\PYG{n+nf}{OUT}\PYG{+w}{ }\PYG{l+m+mh}{0x64}\PYG{p}{,}\PYG{+w}{ }\PYG{n+nb}{AL}\PYG{+w}{	}\PYG{c+c1}{; send command to 8042 PS/2 controller}
+\PYG{+w}{	}\PYG{n+nf}{SHR}\PYG{+w}{ }\PYG{n+nb}{AX}\PYG{p}{,}\PYG{+w}{ }\PYG{l+m+mi}{8}\PYG{+w}{	}\PYG{c+c1}{; put original status register back}
+\PYG{+w}{	}\PYG{n+nf}{CALL}\PYG{+w}{ }\PYG{n+nv}{PS2COMAWAIT}\PYG{c+c1}{; wait}
+\PYG{+w}{	}\PYG{n+nf}{OUT}\PYG{+w}{ }\PYG{l+m+mh}{0x60}\PYG{p}{,}\PYG{+w}{ }\PYG{n+nb}{AL}\PYG{+w}{	}\PYG{c+c1}{; send new output register to I/O port}
+\PYG{c+c1}{;	LIDT [IDTR]	; load IDT with offset 0, length 0, one gate with contents P=0 (no interrupt handlers).}
+\PYG{c+c1}{;	LGDT [GDTR]	; load GDT with dummy registers}
+\PYG{c+c1}{;	MOV EAX, CR0}
+\PYG{c+c1}{;	OR EAX, 1	;PE=1 (protection enable) }
+\PYG{c+c1}{;	MOV CR0, EAX}
+\PYG{c+c1}{;	JMP 0x8:0x4000	; go! perform a long jump to the starting address with the CODESEG selected}
+\PYG{+w}{	}\PYG{n+nf}{JMP}\PYG{+w}{ }\PYG{l+m+mh}{0x0}\PYG{p}{:}\PYG{l+m+mh}{0x4000}\PYG{+w}{	}\PYG{c+c1}{;go to memory address 0x4000}
+
+\PYG{c+c1}{; data area}
+\PYG{n+nl}{FLOPPYERROR:}\PYG{+w}{	}\PYG{k+kd}{DB}\PYG{+w}{ }\PYG{l+s}{\PYGZdq{}Floppy error!\PYGZdq{}}\PYG{p}{,}\PYG{+w}{ }\PYG{l+m+mi}{0}
+\PYG{n+nl}{STAGEFNAME:}\PYG{+w}{	}\PYG{k+kd}{DB}\PYG{+w}{ }\PYG{l+s}{\PYGZdq{}STAGE2  BIN\PYGZdq{}}
+\PYG{n+nl}{PS2COMAWAIT:}
+\PYG{+w}{	}\PYG{n+nf}{PUSH}\PYG{+w}{ }\PYG{n+nb}{AX}\PYG{+w}{		}\PYG{c+c1}{; PS2COMAWAIT clobbers AX}
+\PYG{+w}{	}\PYG{n+nf}{IN}\PYG{+w}{ }\PYG{n+nb}{AL}\PYG{p}{,}\PYG{+w}{ }\PYG{l+m+mh}{0x64}\PYG{+w}{	}\PYG{c+c1}{; receive status register.}
+\PYG{+w}{	}\PYG{n+nf}{TEST}\PYG{+w}{ }\PYG{n+nb}{AL}\PYG{p}{,}\PYG{+w}{ }\PYG{l+m+mi}{2}\PYG{+w}{	}\PYG{c+c1}{; test bit at 0x02}
+\PYG{+w}{	}\PYG{n+nf}{JZ}\PYG{+w}{ }\PYG{n+nv}{COMREADY}\PYG{+w}{	}\PYG{c+c1}{; if zero, go to common RET routine in BPRINT.}
+\PYG{+w}{	}\PYG{n+nf}{JMP}\PYG{+w}{ }\PYG{n+nv}{PS2COMAWAIT}\PYG{+w}{	}\PYG{c+c1}{; loop. If it hangs, then the 8042 controller is destroyed anyway so it\PYGZsq{}s pointless}
+\PYG{n+nl}{PS2DATAAWAIT:}\PYG{+w}{	}
+\PYG{+w}{	}\PYG{n+nf}{PUSH}\PYG{+w}{ }\PYG{n+nb}{AX}
+\PYG{+w}{	}\PYG{n+nf}{IN}\PYG{+w}{ }\PYG{n+nb}{AL}\PYG{p}{,}\PYG{+w}{ }\PYG{l+m+mh}{0x64}
+\PYG{+w}{	}\PYG{n+nf}{TEST}\PYG{+w}{ }\PYG{n+nb}{AL}\PYG{p}{,}\PYG{+w}{ }\PYG{l+m+mi}{1}
+\PYG{+w}{	}\PYG{n+nf}{JZ}\PYG{+w}{ }\PYG{n+nv}{COMREADY}
+\PYG{+w}{	}\PYG{n+nf}{JMP}\PYG{+w}{ }\PYG{n+nv}{PS2DATAAWAIT}
+\PYG{n+nl}{COMREADY:}\PYG{+w}{	}
+\PYG{+w}{	}\PYG{n+nf}{POP}\PYG{+w}{ }\PYG{n+nb}{AX}
+\PYG{+w}{	}\PYG{n+nf}{RET}\PYG{+w}{ }
+\PYG{n+nl}{NOA20:}
+\PYG{+w}{	}\PYG{k+kd}{DB}\PYG{+w}{ }\PYG{l+s}{\PYGZdq{}A20 LINE ENABLE FAIL\PYGZdq{}}
+\PYG{+w}{				}\PYG{c+c1}{; if the A20 line fails to enable the routine should catch it and print this }
+\PYG{+w}{	}\PYG{k+kd}{TIMES}\PYG{+w}{ }\PYG{l+m+mi}{510}\PYG{+w}{ }\PYG{o}{\PYGZhy{}}\PYG{+w}{ }\PYG{p}{(}\PYG{k+kc}{\PYGZdl{}}\PYG{o}{\PYGZhy{}}\PYG{k+kc}{\PYGZdl{}\PYGZdl{}}\PYG{p}{)}\PYG{+w}{ }\PYG{n+nv}{DB}\PYG{+w}{ }\PYG{l+m+mi}{0}\PYG{+w}{	}\PYG{c+c1}{; pad to 510 bytes (1 sector \PYGZhy{} bootsector magic number) }
+\PYG{+w}{	}\PYG{k+kd}{DW}\PYG{+w}{ }\PYG{l+m+mh}{0xAA55}\PYG{+w}{		}\PYG{c+c1}{; magic number for bootsector at 0x200. Actually 0x55 0xaa but NASM packs as little endian. }
+\end{Verbatim}
